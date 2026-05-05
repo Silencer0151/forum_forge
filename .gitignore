@@ -1,0 +1,7 @@
+data/
+uploads/
+certs/
+*.db
+forum_forge
+.env
+/docs/TASKS.md

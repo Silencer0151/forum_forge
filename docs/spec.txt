@@ -1,0 +1,161 @@
+Forumforge — v1 Specification
+=============================
+
+1. Product Overview
+-------------------
+Forumforge is a classic-leaning, text-first discussion forum with modern conveniences. 
+It serves niche communities that value clarity, structure, and usability over flashy UI. 
+The system emphasizes simplicity, speed, and reliability, with a Go backend and a 
+lightweight HTMX-enhanced frontend.
+
+2. Core Features
+----------------
+
+2.1 Entities
+- User
+- Thread
+- Post
+- Category
+- Subcategory (shallow hierarchy)
+- Private Message
+- Reaction
+- Attachment (images + files)
+
+2.2 Thread & Post Features
+- Pagination
+- Nested replies (1–2 levels)
+- Quoting
+- Reactions (like/upvote)
+- Markdown, BBCode, plaintext, code blocks
+- Link auto-embedding
+- Attachments (images/files)
+- User-editable posts (configurable edit window)
+- Auto-saved drafts
+- Thread bumping on new replies
+
+3. Roles & Permissions
+----------------------
+
+3.1 Roles
+- Admin — full control
+- Moderator — delete posts, freeze threads, ban users, edit posts
+- Member — create threads, reply, edit own posts, react, message
+- Guest — read-only access to public categories
+
+3.2 Guest Access
+- Can browse public categories
+- Cannot post, react, message, or view restricted areas
+
+4. Registration & Authentication
+--------------------------------
+
+4.1 Primary Method: Email + Password
+Pros:
+- Simple and universal
+- No third-party dependency
+- Fits classic forum expectations
+
+Cons:
+- Must handle password resets and email deliverability
+
+4.2 Optional Future Add-ons
+- OAuth (Google/GitHub)
+- Invite-only mode
+
+4.3 Account Recovery
+- Email verification
+- Password reset link
+
+5. Moderation & Safety
+----------------------
+
+5.1 Tools
+- Delete posts
+- Freeze/lock threads
+- Ban users
+- Edit posts
+- Basic reporting system (reason + link to post)
+
+5.2 Spam Protection
+- Rate limiting (per IP + per user)
+- Simple heuristics (link limits, keyword checks)
+- CAPTCHA on registration and early posts
+
+6. Backend Architecture (Go)
+----------------------------
+
+6.1 Stack
+- Language: Go
+- Routing: Chi, Echo, or net/http
+- Database: SQLite (simple) or Postgres (scalable)
+- Data access: ORM (GORM/Ent) or raw SQL
+- Migrations: golang-migrate
+- Sessions: Cookie session ID + server-side store
+- Caching: In-process; Redis optional later
+- WebSockets: Optional (live updates), not required for v1
+
+7. Frontend Architecture (HTMX)
+-------------------------------
+
+7.1 Rendering Model
+- Server-rendered HTML templates
+- HTMX for dynamic partial updates
+
+7.2 HTMX Usage
+- Inline posting
+- Inline editing
+- Pagination
+- Reactions
+- Search results
+- Modal or inline forms
+
+7.3 JS Footprint
+- HTMX only
+- Optional Alpine.js for small UI behaviors
+
+8. UX Behavior
+--------------
+- Thread bumping
+- Unread indicators (optional v1)
+- Auto-saved drafts (localStorage or server-side)
+- Simple search (title + body)
+- Clean, text-first layout with modern spacing and typography
+
+9. Performance & Scaling
+------------------------
+- Expected users: ~1000
+- Basic rate limiting
+- Basic caching
+- Horizontal scalability considered but not required
+- SQLite → Postgres migration path planned
+
+10. Deployment & Testing
+------------------------
+
+10.1 Deployment
+- With Postgres: Docker Compose
+- With SQLite: Single Go binary on a VPS
+
+10.2 Testing
+- Full unit tests
+- Integration tests for:
+  - Registration
+  - Login
+  - Posting
+  - Editing
+  - Moderation
+  - Search
+
+10.3 CI/CD
+- Simple pipeline (build + test)
+
+11. Roadmap (Post-v1)
+---------------------
+- Full-text search
+- Rich link previews
+- WebSocket live updates
+- User mentions + notifications
+- Shadowbanning
+- Mobile-optimized UI
+- OAuth
+- Theme customization
