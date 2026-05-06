@@ -41,6 +41,7 @@ type User struct {
 	LastSeenAt     time.Time `json:"last_seen_at"`
 	Banned         bool      `json:"banned"`
 	BanReason      string    `json:"ban_reason,omitempty"`
+	EmailVerified  bool      `json:"email_verified"`
 	ExternalID     string    `json:"external_id,omitempty"`
 	ExternalSource string    `json:"external_source,omitempty"`
 }

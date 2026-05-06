@@ -1,0 +1,19 @@
+{{define "content"}}
+<div class="ff-page-header">
+    <h1 class="ff-page-header__title">Email Verification</h1>
+</div>
+
+<div class="ff-card" style="max-width: 480px;">
+    {{if .Verified}}
+    <p>{{.Notice}}</p>
+    <p style="margin-top: var(--ff-sp-3);">
+        <a class="ff-btn ff-btn--primary" href="/">Back to forum</a>
+    </p>
+    {{else}}
+    <p class="ff-input-error" role="alert" style="margin-bottom: var(--ff-sp-2);">{{.Error}}</p>
+    <p class="ff-text-muted">
+        <a href="/auth/login">Log in</a> and request a new verification email from your settings.
+    </p>
+    {{end}}
+</div>
+{{end}}

@@ -15,6 +15,7 @@ import (
 	"syscall"
 
 	forum "github.com/nitro/forum_forge"
+	"github.com/nitro/forum_forge/internal/auth"
 	"github.com/nitro/forum_forge/internal/config"
 	"github.com/nitro/forum_forge/internal/database"
 	"github.com/nitro/forum_forge/internal/render"
@@ -78,7 +79,27 @@ func run(cfg *config.Config) error {
 		return err
 	}
 
-	srv := server.New(cfg, st, r, staticFS)
+	emailTemplates, err := auth.LoadEmailTemplates(templatesFS)
+	if err != nil {
+		return fmt.Errorf("load email templates: %w", err)
+	}
+	mailer, err := auth.NewMailer(auth.SMTPConfig{
+		Host:     cfg.SMTPHost,
+		Port:     cfg.SMTPPort,
+		Username: cfg.SMTPUser,
+		Password: cfg.SMTPPass,
+		From:     cfg.SMTPFrom,
+	}, emailTemplates)
+	if err != nil {
+		return fmt.Errorf("build mailer: %w", err)
+	}
+	authDeps := server.AuthDeps{
+		Service: auth.New(st),
+		Tokens:  auth.NewTokenService(st),
+		Mailer:  mailer,
+	}
+
+	srv := server.New(cfg, st, r, staticFS, authDeps)
 
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()

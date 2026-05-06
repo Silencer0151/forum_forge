@@ -13,12 +13,12 @@ import (
 
 const userCols = `id, username, email, password_hash, display_name, avatar_url,
 	signature, role, post_count, created_at, last_seen_at,
-	banned, ban_reason, external_id, external_source`
+	banned, ban_reason, email_verified, external_id, external_source`
 
 func scanUser(row rowScanner) (*model.User, error) {
 	var u model.User
 	var banReason, externalID, externalSource sql.NullString
-	var banned int
+	var banned, emailVerified int
 	var createdAt, lastSeenAt dbTime
 
 	err := row.Scan(
@@ -26,7 +26,7 @@ func scanUser(row rowScanner) (*model.User, error) {
 		&u.DisplayName, &u.AvatarURL, &u.Signature,
 		&u.Role, &u.PostCount,
 		&createdAt, &lastSeenAt,
-		&banned, &banReason, &externalID, &externalSource,
+		&banned, &banReason, &emailVerified, &externalID, &externalSource,
 	)
 	if err != nil {
 		return nil, err
@@ -35,6 +35,7 @@ func scanUser(row rowScanner) (*model.User, error) {
 	u.LastSeenAt = lastSeenAt.T
 	u.Banned = banned != 0
 	u.BanReason = banReason.String
+	u.EmailVerified = emailVerified != 0
 	u.ExternalID = externalID.String
 	u.ExternalSource = externalSource.String
 	return &u, nil
@@ -108,12 +109,12 @@ func (s *Store) UpdateUser(ctx context.Context, u *model.User) error {
 		UPDATE users SET
 			username = ?, email = ?, password_hash = ?, display_name = ?,
 			avatar_url = ?, signature = ?, role = ?,
-			ban_reason = ?, banned = ?,
+			ban_reason = ?, banned = ?, email_verified = ?,
 			external_id = ?, external_source = ?
 		WHERE id = ?`,
 		u.Username, u.Email, u.PasswordHash, u.DisplayName,
 		u.AvatarURL, u.Signature, string(u.Role),
-		nullStr(u.BanReason), boolInt(u.Banned),
+		nullStr(u.BanReason), boolInt(u.Banned), boolInt(u.EmailVerified),
 		nullStr(u.ExternalID), nullStr(u.ExternalSource),
 		u.ID,
 	)

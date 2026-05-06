@@ -50,9 +50,18 @@ type Server struct {
 	authHandlers *handler.AuthHandlers
 }
 
+// AuthDeps bundles the auth-flow building blocks the server needs but does
+// not own. The caller (cmd/forum) constructs the mailer + token service so
+// it can wire SMTP config and email templates from environment + embed.FS.
+type AuthDeps struct {
+	Service *auth.Service
+	Tokens  *auth.TokenService
+	Mailer  *auth.Mailer
+}
+
 // New builds a Server with all routes registered and wrapped in the standard
 // middleware chain. It does not start listening; call Run for that.
-func New(cfg *config.Config, st store.Store, r *render.Renderer, staticFS fs.FS) *Server {
+func New(cfg *config.Config, st store.Store, r *render.Renderer, staticFS fs.FS, authDeps AuthDeps) *Server {
 	s := &Server{
 		cfg:      cfg,
 		store:    st,
@@ -61,8 +70,10 @@ func New(cfg *config.Config, st store.Store, r *render.Renderer, staticFS fs.FS)
 		mux:      http.NewServeMux(),
 	}
 
-	authSvc := auth.New(st)
-	s.authHandlers = handler.NewAuth(authSvc, r, handler.AuthConfig{Secure: s.secureCookies()})
+	s.authHandlers = handler.NewAuth(
+		authDeps.Service, authDeps.Tokens, authDeps.Mailer, r,
+		handler.AuthConfig{Secure: s.secureCookies(), BaseURL: cfg.BaseURL},
+	)
 
 	s.registerRoutes()
 	s.handler = s.wrapMiddleware(s.mux)
@@ -193,12 +204,11 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("GET /auth/register", s.authHandlers.RegisterPage)
 	s.mux.HandleFunc("POST /auth/register", s.authHandlers.Register)
 	s.mux.HandleFunc("POST /auth/logout", s.authHandlers.Logout)
-	// Email verification + password reset land in Task 3.2.
-	s.mux.HandleFunc("GET /auth/verify", stub)
-	s.mux.HandleFunc("GET /auth/forgot-password", stub)
-	s.mux.HandleFunc("POST /auth/forgot-password", stub)
-	s.mux.HandleFunc("GET /auth/reset-password", stub)
-	s.mux.HandleFunc("POST /auth/reset-password", stub)
+	s.mux.HandleFunc("GET /auth/verify", s.authHandlers.VerifyEmail)
+	s.mux.HandleFunc("GET /auth/forgot-password", s.authHandlers.ForgotPasswordPage)
+	s.mux.HandleFunc("POST /auth/forgot-password", s.authHandlers.ForgotPassword)
+	s.mux.HandleFunc("GET /auth/reset-password", s.authHandlers.ResetPasswordPage)
+	s.mux.HandleFunc("POST /auth/reset-password", s.authHandlers.ResetPassword)
 
 	// Moderation
 	s.mux.HandleFunc("GET /mod/reports", stub)

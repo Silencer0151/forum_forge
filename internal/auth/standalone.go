@@ -248,6 +248,17 @@ func (s *Service) Login(ctx context.Context, in LoginInput) (*Result, error) {
 	return &Result{User: u, Session: sess}, nil
 }
 
+// HashPassword runs bcrypt at the service's configured cost and returns the
+// resulting hash. Exported so the password-reset handler (Task 3.2) can reuse
+// the same cost as registration without poking at internal state.
+func (s *Service) HashPassword(raw string) (string, error) {
+	hash, err := bcrypt.GenerateFromPassword([]byte(raw), s.bcryptCost)
+	if err != nil {
+		return "", fmt.Errorf("hash password: %w", err)
+	}
+	return string(hash), nil
+}
+
 // Logout deletes the session record. A missing session is not an error: the
 // user is already logged out from the server's point of view, and the handler
 // will clear the cookie unconditionally.

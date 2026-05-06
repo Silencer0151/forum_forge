@@ -1,0 +1,12 @@
+{{define "content"}}
+<div class="ff-page-header">
+    <h1 class="ff-page-header__title">Reset Link Invalid</h1>
+</div>
+
+<div class="ff-card" style="max-width: 480px;">
+    <p class="ff-input-error" role="alert" style="margin-bottom: var(--ff-sp-2);">{{.Error}}</p>
+    <p class="ff-text-muted">
+        <a class="ff-btn ff-btn--primary" href="/auth/forgot-password">Request a new reset link</a>
+    </p>
+</div>
+{{end}}
