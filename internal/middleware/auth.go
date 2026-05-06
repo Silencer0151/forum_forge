@@ -6,74 +6,54 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/nitro/forum_forge/internal/auth"
 	"github.com/nitro/forum_forge/internal/model"
-	"github.com/nitro/forum_forge/internal/store"
 )
 
-// SessionCookieName is the name of the cookie that carries the session ID.
-// It must match what auth handlers set on login and clear on logout
-// (see spec.md §4.1).
-const SessionCookieName = "forum_session"
+// SessionCookieName is the name of the cookie that carries the standalone
+// session ID. Mirrors auth.SessionCookieName so middleware/handler code can
+// reference it without importing the auth package directly. Integrated mode
+// (Kanoogi) uses its own cookie scheme owned by the adapter.
+const SessionCookieName = auth.SessionCookieName
 
-// AuthStore is the slice of store.Store the auth middleware needs.
-// Defining a smaller interface keeps tests trivial — the real *sqlite.Store
-// satisfies it implicitly.
-type AuthStore interface {
-	GetSession(ctx context.Context, id string) (*model.Session, error)
-	GetUserByID(ctx context.Context, id int64) (*model.User, error)
-	DeleteSession(ctx context.Context, id string) error
-}
-
-// Auth resolves the session cookie into a *model.User and attaches it (along
-// with the session) to the request context. Missing, expired, or invalid
-// cookies leave the context user-less so the request continues as a guest.
+// Auth resolves the request's authentication state through the supplied
+// auth.Authenticator and attaches the resulting *model.User and (when
+// applicable) *model.Session to the request context.
 //
-// A banned user is treated as a guest and their session is destroyed: this is
-// what makes a moderator-issued ban take effect on the user's next request
-// without waiting for the cookie to expire.
-func Auth(st AuthStore) func(http.Handler) http.Handler {
+// Adapter selection happens at construction (server wiring): standalone for
+// FORUM_AUTH_MODE=standalone, kanoogi for integrated. The middleware itself
+// is mode-agnostic — it just calls AuthenticateRequest, which dispatches via
+// AuthAdapter.Authenticate underneath. Treating the adapter as a black box
+// here is what lets task 3.3's interface design swap implementations
+// without touching the middleware chain.
+//
+// On auth.ErrSessionInvalid the middleware clears the session cookie and
+// passes the request through as a guest. Any other error is logged and the
+// request also degrades to guest — middleware never blocks a request just
+// because the auth lookup hiccupped.
+func Auth(a auth.Authenticator) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			cookie, err := r.Cookie(SessionCookieName)
-			if err != nil || cookie.Value == "" {
+			user, sess, err := a.AuthenticateRequest(r)
+			if err != nil {
+				if errors.Is(err, auth.ErrSessionInvalid) {
+					clearSessionCookie(w)
+				} else if !errors.Is(err, auth.ErrNotImplemented) {
+					slog.Error("auth: resolve request", "error", err)
+				}
+				next.ServeHTTP(w, r)
+				return
+			}
+			if user == nil {
 				next.ServeHTTP(w, r)
 				return
 			}
 
 			ctx := r.Context()
-			sess, err := st.GetSession(ctx, cookie.Value)
-			if err != nil {
-				if !errors.Is(err, store.ErrNotFound) {
-					slog.Error("auth: get session", "error", err)
-				}
-				clearSessionCookie(w)
-				next.ServeHTTP(w, r)
-				return
-			}
-			if sess == nil { // expired
-				clearSessionCookie(w)
-				next.ServeHTTP(w, r)
-				return
-			}
-
-			user, err := st.GetUserByID(ctx, sess.UserID)
-			if err != nil {
-				if !errors.Is(err, store.ErrNotFound) {
-					slog.Error("auth: get user", "error", err)
-				}
-				clearSessionCookie(w)
-				next.ServeHTTP(w, r)
-				return
-			}
-			if user.Banned {
-				_ = st.DeleteSession(ctx, sess.ID)
-				clearSessionCookie(w)
-				next.ServeHTTP(w, r)
-				return
-			}
-
 			ctx = context.WithValue(ctx, userCtxKey, user)
-			ctx = context.WithValue(ctx, sessionCtxKey, sess)
+			if sess != nil {
+				ctx = context.WithValue(ctx, sessionCtxKey, sess)
+			}
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
@@ -86,7 +66,8 @@ func UserFromContext(ctx context.Context) *model.User {
 }
 
 // SessionFromContext returns the session attached to the request, or nil if
-// the request is unauthenticated.
+// the request is unauthenticated or the adapter does not maintain a local
+// session row (integrated mode).
 func SessionFromContext(ctx context.Context) *model.Session {
 	s, _ := ctx.Value(sessionCtxKey).(*model.Session)
 	return s

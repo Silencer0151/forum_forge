@@ -138,7 +138,7 @@ func newTestEnv(t *testing.T) (*httptest.Server, *http.Client, *emailCapture) {
 	})
 
 	chain := middleware.Chain(
-		middleware.Auth(st),
+		middleware.Auth(svc),
 		middleware.CSRF(middleware.CSRFConfig{Secure: false}),
 	)
 	srv := httptest.NewServer(chain(mux))

@@ -1,55 +1,59 @@
 package middleware_test
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
+	"github.com/nitro/forum_forge/internal/auth"
 	"github.com/nitro/forum_forge/internal/middleware"
 	"github.com/nitro/forum_forge/internal/model"
-	"github.com/nitro/forum_forge/internal/store"
 )
 
-// stubAuthStore implements middleware.AuthStore for tests.
-type stubAuthStore struct {
-	sessions       map[string]*model.Session
-	sessionErr     error
-	users          map[int64]*model.User
-	userErr        error
-	deletedSession string
+// stubAuthenticator implements auth.Authenticator for tests. It scripts the
+// outcome of AuthenticateRequest based on the inbound cookie value so each
+// scenario can be expressed as a plain map lookup.
+type stubAuthenticator struct {
+	// outcomes is keyed by session cookie value. A nil entry means "guest".
+	outcomes map[string]stubOutcome
+	// noCookieErr, when set, is returned for requests that don't carry the
+	// session cookie at all. Used to verify the middleware does not call
+	// AuthenticateRequest in surprising ways.
+	noCookieErr error
 }
 
-func (s *stubAuthStore) GetSession(_ context.Context, id string) (*model.Session, error) {
-	if s.sessionErr != nil {
-		return nil, s.sessionErr
+type stubOutcome struct {
+	user *model.User
+	sess *model.Session
+	err  error
+}
+
+func (s *stubAuthenticator) AuthenticateRequest(r *http.Request) (*model.User, *model.Session, error) {
+	cookie, err := r.Cookie(middleware.SessionCookieName)
+	if err != nil || cookie.Value == "" {
+		return nil, nil, s.noCookieErr
 	}
-	sess, ok := s.sessions[id]
+	out, ok := s.outcomes[cookie.Value]
 	if !ok {
-		return nil, store.ErrNotFound
+		return nil, nil, auth.ErrSessionInvalid
 	}
-	if !sess.ExpiresAt.IsZero() && time.Now().After(sess.ExpiresAt) {
-		return nil, nil
-	}
-	return sess, nil
+	return out.user, out.sess, out.err
 }
 
-func (s *stubAuthStore) GetUserByID(_ context.Context, id int64) (*model.User, error) {
-	if s.userErr != nil {
-		return nil, s.userErr
-	}
-	u, ok := s.users[id]
-	if !ok {
-		return nil, store.ErrNotFound
-	}
-	return u, nil
+func (s *stubAuthenticator) Authenticate(*http.Request) (*auth.ExternalUser, error) {
+	// Not exercised by middleware tests — the middleware only calls
+	// AuthenticateRequest. Returning ErrNotImplemented here would mask
+	// accidental call sites; nil-nil keeps the stub permissive.
+	return nil, nil
 }
 
-func (s *stubAuthStore) DeleteSession(_ context.Context, id string) error {
-	s.deletedSession = id
-	delete(s.sessions, id)
-	return nil
+func (s *stubAuthenticator) GetUser(string) (*auth.ExternalUser, error) {
+	return nil, nil
+}
+
+func (s *stubAuthenticator) GetAvatarURL(string) (string, error) {
+	return "", nil
 }
 
 // peekHandler captures whatever the auth middleware injected into the
@@ -67,9 +71,9 @@ func (p *peekHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func TestAuth_NoCookie_GuestPassthrough(t *testing.T) {
 	t.Parallel()
-	st := &stubAuthStore{}
+	a := &stubAuthenticator{}
 	peek := &peekHandler{}
-	h := middleware.Auth(st)(peek)
+	h := middleware.Auth(a)(peek)
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rr := httptest.NewRecorder()
@@ -90,12 +94,13 @@ func TestAuth_ValidSession_InjectsUser(t *testing.T) {
 	t.Parallel()
 	user := &model.User{ID: 42, Username: "alice", Role: model.RoleMember}
 	sess := &model.Session{ID: "sess-1", UserID: 42, ExpiresAt: time.Now().Add(time.Hour)}
-	st := &stubAuthStore{
-		sessions: map[string]*model.Session{"sess-1": sess},
-		users:    map[int64]*model.User{42: user},
+	a := &stubAuthenticator{
+		outcomes: map[string]stubOutcome{
+			"sess-1": {user: user, sess: sess},
+		},
 	}
 	peek := &peekHandler{}
-	h := middleware.Auth(st)(peek)
+	h := middleware.Auth(a)(peek)
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.AddCookie(&http.Cookie{Name: middleware.SessionCookieName, Value: "sess-1"})
@@ -110,11 +115,15 @@ func TestAuth_ValidSession_InjectsUser(t *testing.T) {
 	}
 }
 
-func TestAuth_UnknownSession_ClearsCookie(t *testing.T) {
+func TestAuth_InvalidSession_ClearsCookie(t *testing.T) {
 	t.Parallel()
-	st := &stubAuthStore{}
+	a := &stubAuthenticator{
+		outcomes: map[string]stubOutcome{
+			"ghost": {err: auth.ErrSessionInvalid},
+		},
+	}
 	peek := &peekHandler{}
-	h := middleware.Auth(st)(peek)
+	h := middleware.Auth(a)(peek)
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.AddCookie(&http.Cookie{Name: middleware.SessionCookieName, Value: "ghost"})
@@ -122,60 +131,35 @@ func TestAuth_UnknownSession_ClearsCookie(t *testing.T) {
 	h.ServeHTTP(rr, req)
 
 	if peek.gotUser != nil {
-		t.Fatalf("unknown session should leave context user-less")
+		t.Fatalf("invalid session should leave context user-less")
 	}
 	if !cookieCleared(rr, middleware.SessionCookieName) {
-		t.Fatalf("expected session cookie to be cleared on unknown session")
+		t.Fatalf("expected session cookie to be cleared on invalid session")
 	}
 }
 
-func TestAuth_ExpiredSession_ClearsCookie(t *testing.T) {
+func TestAuth_AdapterError_LogsAndPassesThrough(t *testing.T) {
 	t.Parallel()
-	expired := &model.Session{ID: "old", UserID: 1, ExpiresAt: time.Now().Add(-time.Minute)}
-	st := &stubAuthStore{
-		sessions: map[string]*model.Session{"old": expired},
-		users:    map[int64]*model.User{1: {ID: 1, Username: "x"}},
+	// A non-ErrSessionInvalid error should be logged but should not block
+	// the request — guests degrade gracefully.
+	a := &stubAuthenticator{
+		outcomes: map[string]stubOutcome{
+			"boom": {err: auth.ErrNotImplemented},
+		},
 	}
 	peek := &peekHandler{}
-	h := middleware.Auth(st)(peek)
+	h := middleware.Auth(a)(peek)
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	req.AddCookie(&http.Cookie{Name: middleware.SessionCookieName, Value: "old"})
+	req.AddCookie(&http.Cookie{Name: middleware.SessionCookieName, Value: "boom"})
 	rr := httptest.NewRecorder()
 	h.ServeHTTP(rr, req)
 
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rr.Code)
+	}
 	if peek.gotUser != nil {
-		t.Fatalf("expired session should leave context user-less")
-	}
-	if !cookieCleared(rr, middleware.SessionCookieName) {
-		t.Fatalf("expected session cookie to be cleared on expired session")
-	}
-}
-
-func TestAuth_BannedUser_DeletesSessionAndClearsCookie(t *testing.T) {
-	t.Parallel()
-	user := &model.User{ID: 7, Username: "bad", Banned: true}
-	sess := &model.Session{ID: "sess-7", UserID: 7, ExpiresAt: time.Now().Add(time.Hour)}
-	st := &stubAuthStore{
-		sessions: map[string]*model.Session{"sess-7": sess},
-		users:    map[int64]*model.User{7: user},
-	}
-	peek := &peekHandler{}
-	h := middleware.Auth(st)(peek)
-
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	req.AddCookie(&http.Cookie{Name: middleware.SessionCookieName, Value: "sess-7"})
-	rr := httptest.NewRecorder()
-	h.ServeHTTP(rr, req)
-
-	if peek.gotUser != nil {
-		t.Fatalf("banned user should not be present in context")
-	}
-	if st.deletedSession != "sess-7" {
-		t.Fatalf("expected session sess-7 to be deleted, got %q", st.deletedSession)
-	}
-	if !cookieCleared(rr, middleware.SessionCookieName) {
-		t.Fatalf("expected session cookie to be cleared on ban")
+		t.Fatalf("adapter error should leave context user-less")
 	}
 }
 

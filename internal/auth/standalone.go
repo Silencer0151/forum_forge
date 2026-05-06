@@ -13,8 +13,11 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"log/slog"
+	"net/http"
 	"net/mail"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -57,14 +60,21 @@ var (
 // package self-contained and makes tests easy to wire with a fake.
 type SessionStore interface {
 	CreateUser(ctx context.Context, u *model.User) error
+	GetUserByID(ctx context.Context, id int64) (*model.User, error)
 	GetUserByEmail(ctx context.Context, email string) (*model.User, error)
 	GetUserByUsername(ctx context.Context, username string) (*model.User, error)
 	UpdateUser(ctx context.Context, u *model.User) error
 
 	CreateSession(ctx context.Context, s *model.Session) error
+	GetSession(ctx context.Context, id string) (*model.Session, error)
 	DeleteSession(ctx context.Context, id string) error
 	DeleteUserSessions(ctx context.Context, userID int64) error
 }
+
+// SessionCookieName is the cookie that carries the standalone session ID.
+// Mirrored in middleware/auth.go so the adapter can clear and read the same
+// name without importing middleware (which would create an import cycle).
+const SessionCookieName = "forum_session"
 
 // Service implements standalone (email+password) authentication.
 type Service struct {
@@ -292,4 +302,115 @@ func newSessionID() (string, error) {
 		return "", err
 	}
 	return base64.RawURLEncoding.EncodeToString(b), nil
+}
+
+// ── AuthAdapter / Authenticator implementation ───────────────────────────────
+//
+// Service satisfies both the spec.md §4.2 AuthAdapter interface and the
+// runtime-facing Authenticator extension used by the auth middleware. The
+// AuthAdapter contract returns ExternalUser values built from the local user
+// row (ExternalID is the local user ID rendered as a string, source tag is
+// SourceStandalone). The Authenticator path returns the local user and
+// session directly so the middleware can populate the request context
+// without doing its own store lookups.
+
+// Authenticate satisfies AuthAdapter. It reads the session cookie, validates
+// the row, and returns a populated ExternalUser. Guests (no cookie) get
+// (nil, nil); stale state (missing/expired session, missing user, banned
+// user) yields (nil, ErrSessionInvalid) so the caller can clear the cookie.
+func (s *Service) Authenticate(r *http.Request) (*ExternalUser, error) {
+	user, _, err := s.AuthenticateRequest(r)
+	if err != nil {
+		return nil, err
+	}
+	if user == nil {
+		return nil, nil
+	}
+	return externalUserFromLocal(user), nil
+}
+
+// AuthenticateRequest is the Authenticator entry point used by the middleware.
+// It performs the full session-cookie → session row → user row → ban-check
+// pipeline and returns the resolved local user and session. A banned user
+// has their session deleted as a side effect so the ban takes effect on the
+// next request.
+func (s *Service) AuthenticateRequest(r *http.Request) (*model.User, *model.Session, error) {
+	cookie, err := r.Cookie(SessionCookieName)
+	if err != nil || cookie.Value == "" {
+		return nil, nil, nil
+	}
+
+	ctx := r.Context()
+	sess, err := s.store.GetSession(ctx, cookie.Value)
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			return nil, nil, ErrSessionInvalid
+		}
+		slog.Error("auth: get session", "error", err)
+		return nil, nil, fmt.Errorf("get session: %w", err)
+	}
+	if sess == nil { // store may signal expiry by returning a nil row + nil error
+		return nil, nil, ErrSessionInvalid
+	}
+
+	user, err := s.store.GetUserByID(ctx, sess.UserID)
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			return nil, nil, ErrSessionInvalid
+		}
+		slog.Error("auth: get user", "error", err)
+		return nil, nil, fmt.Errorf("get user: %w", err)
+	}
+
+	if user.Banned {
+		// Tear down the server-side session so the cookie value can't be
+		// reused. The middleware separately clears the cookie on the
+		// response. Errors here are logged but don't change the outcome:
+		// the user is still treated as logged out.
+		if err := s.store.DeleteSession(ctx, sess.ID); err != nil {
+			slog.Error("auth: delete session for banned user", "error", err)
+		}
+		return nil, nil, ErrSessionInvalid
+	}
+
+	return user, sess, nil
+}
+
+// GetUser satisfies AuthAdapter. externalID is the local user ID as a
+// decimal string (matching what Authenticate emits). Returns
+// store.ErrNotFound for unknown IDs.
+func (s *Service) GetUser(externalID string) (*ExternalUser, error) {
+	id, err := strconv.ParseInt(externalID, 10, 64)
+	if err != nil {
+		return nil, store.ErrNotFound
+	}
+	user, err := s.store.GetUserByID(context.Background(), id)
+	if err != nil {
+		return nil, err
+	}
+	return externalUserFromLocal(user), nil
+}
+
+// GetAvatarURL satisfies AuthAdapter. For standalone the avatar lives on the
+// local user row, so this is just a lookup. Returns the empty string when
+// the user has no avatar set; callers fall back to a default in templates.
+func (s *Service) GetAvatarURL(externalID string) (string, error) {
+	ext, err := s.GetUser(externalID)
+	if err != nil {
+		return "", err
+	}
+	return ext.AvatarURL, nil
+}
+
+// externalUserFromLocal projects a local *model.User onto the spec.md §4.2
+// ExternalUser shape. Used by both Authenticate and GetUser to keep the
+// projection consistent.
+func externalUserFromLocal(u *model.User) *ExternalUser {
+	return &ExternalUser{
+		ExternalID:  strconv.FormatInt(u.ID, 10),
+		Username:    u.Username,
+		DisplayName: u.DisplayNameOrUsername(),
+		AvatarURL:   u.AvatarURL,
+		Email:       u.Email,
+	}
 }

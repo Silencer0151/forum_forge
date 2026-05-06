@@ -40,12 +40,13 @@ const (
 
 // Server is the composed HTTP server: router + dependencies + lifecycle.
 type Server struct {
-	cfg      *config.Config
-	store    store.Store
-	renderer *render.Renderer
-	staticFS fs.FS
-	mux      *http.ServeMux
-	handler  http.Handler
+	cfg           *config.Config
+	store         store.Store
+	renderer      *render.Renderer
+	staticFS      fs.FS
+	mux           *http.ServeMux
+	handler       http.Handler
+	authenticator auth.Authenticator
 
 	authHandlers *handler.AuthHandlers
 }
@@ -53,21 +54,35 @@ type Server struct {
 // AuthDeps bundles the auth-flow building blocks the server needs but does
 // not own. The caller (cmd/forum) constructs the mailer + token service so
 // it can wire SMTP config and email templates from environment + embed.FS.
+//
+// Authenticator is the spec.md §4.2 adapter the auth middleware dispatches
+// through. cmd/forum picks standalone or kanoogi based on FORUM_AUTH_MODE
+// and hands the result to the server.
 type AuthDeps struct {
-	Service *auth.Service
-	Tokens  *auth.TokenService
-	Mailer  *auth.Mailer
+	Service       *auth.Service
+	Tokens        *auth.TokenService
+	Mailer        *auth.Mailer
+	Authenticator auth.Authenticator
 }
 
 // New builds a Server with all routes registered and wrapped in the standard
 // middleware chain. It does not start listening; call Run for that.
+//
+// authDeps.Authenticator is the spec.md §4.2 adapter; if nil, New falls back
+// to authDeps.Service (the standalone implementation) so existing callers
+// that pre-date task 3.3 keep working without source changes.
 func New(cfg *config.Config, st store.Store, r *render.Renderer, staticFS fs.FS, authDeps AuthDeps) *Server {
+	authenticator := authDeps.Authenticator
+	if authenticator == nil {
+		authenticator = authDeps.Service
+	}
 	s := &Server{
-		cfg:      cfg,
-		store:    st,
-		renderer: r,
-		staticFS: staticFS,
-		mux:      http.NewServeMux(),
+		cfg:           cfg,
+		store:         st,
+		renderer:      r,
+		staticFS:      staticFS,
+		mux:           http.NewServeMux(),
+		authenticator: authenticator,
 	}
 
 	s.authHandlers = handler.NewAuth(
@@ -97,7 +112,7 @@ func (s *Server) wrapMiddleware(h http.Handler) http.Handler {
 			TrustProxy: s.cfg.TrustProxy,
 			HSTSValue:  s.hstsValue(),
 		}),
-		middleware.Auth(s.store),
+		middleware.Auth(s.authenticator),
 		middleware.Logging(slog.Default()),
 		middleware.RateLimit(limiter),
 		middleware.CSRF(middleware.CSRFConfig{Secure: s.secureCookies()}),

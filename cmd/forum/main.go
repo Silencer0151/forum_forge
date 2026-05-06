@@ -93,10 +93,12 @@ func run(cfg *config.Config) error {
 	if err != nil {
 		return fmt.Errorf("build mailer: %w", err)
 	}
+	svc := auth.New(st)
 	authDeps := server.AuthDeps{
-		Service: auth.New(st),
-		Tokens:  auth.NewTokenService(st),
-		Mailer:  mailer,
+		Service:       svc,
+		Tokens:        auth.NewTokenService(st),
+		Mailer:        mailer,
+		Authenticator: pickAuthenticator(cfg, svc, st),
 	}
 
 	srv := server.New(cfg, st, r, staticFS, authDeps)
@@ -113,6 +115,20 @@ func run(cfg *config.Config) error {
 		"tls_mode", cfg.TLSMode)
 
 	return srv.Run(ctx)
+}
+
+// pickAuthenticator selects the spec.md §4.2 auth adapter for the configured
+// FORUM_AUTH_MODE. The standalone *auth.Service is the default; integrated
+// mode returns the Kanoogi stub, which compiles but errors out at request
+// time until task 3.3's TODOs are filled in.
+func pickAuthenticator(cfg *config.Config, svc *auth.Service, st *sqlitestore.Store) auth.Authenticator {
+	switch cfg.AuthMode {
+	case "integrated":
+		slog.Warn("FORUM_AUTH_MODE=integrated selected; Kanoogi adapter is a stub and will error on every request")
+		return auth.NewKanoogi(auth.KanoogiConfig{}, st)
+	default:
+		return svc
+	}
 }
 
 func runMigrate(cfg *config.Config, cmd string) error {
