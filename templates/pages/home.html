@@ -3,7 +3,14 @@
     <h1 class="ff-page-header__title">Forum Index</h1>
     <p class="ff-page-header__sub">Browse discussions and join the conversation.</p>
 </div>
+
+{{if .Sections}}
+    {{range .Sections}}
+    {{template "category_card" .}}
+    {{end}}
+{{else}}
 <div class="ff-card">
     <p class="ff-text-muted">No categories yet. Check back soon.</p>
 </div>
+{{end}}
 {{end}}

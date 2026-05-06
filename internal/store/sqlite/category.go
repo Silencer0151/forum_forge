@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/nitro/forum_forge/internal/model"
 	"github.com/nitro/forum_forge/internal/store"
@@ -232,4 +233,75 @@ func (s *Store) ReorderSubcategories(ctx context.Context, ids []int64) error {
 		}
 	}
 	return tx.Commit()
+}
+
+// GetSubcategoryStatsBatch returns thread/post counts and last-post info for
+// the given subcategory IDs in a single query. Missing IDs (no threads) are
+// returned with zero counts and an empty LastThreadTitle.
+func (s *Store) GetSubcategoryStatsBatch(ctx context.Context, subcategoryIDs []int64) (map[int64]*store.SubcategoryStats, error) {
+	if len(subcategoryIDs) == 0 {
+		return make(map[int64]*store.SubcategoryStats), nil
+	}
+
+	ph := strings.Repeat("?,", len(subcategoryIDs))
+	ph = ph[:len(ph)-1] // strip trailing comma
+
+	args := make([]any, len(subcategoryIDs))
+	for i, id := range subcategoryIDs {
+		args[i] = id
+	}
+
+	q := fmt.Sprintf(`
+		SELECT
+			s.id,
+			COUNT(t.id)                                       AS thread_count,
+			COALESCE(SUM(t.reply_count + 1), 0)              AS post_count,
+			(SELECT ts.last_post_at
+			   FROM threads ts
+			  WHERE ts.subcategory_id = s.id
+			  ORDER BY ts.last_post_at DESC LIMIT 1)         AS last_post_at,
+			COALESCE(
+				(SELECT u.username
+				   FROM threads ts
+				   LEFT JOIN users u ON u.id = ts.last_post_by
+				  WHERE ts.subcategory_id = s.id
+				  ORDER BY ts.last_post_at DESC LIMIT 1),
+			'')                                              AS last_post_username,
+			COALESCE(
+				(SELECT ts.title
+				   FROM threads ts
+				  WHERE ts.subcategory_id = s.id
+				  ORDER BY ts.last_post_at DESC LIMIT 1),
+			'')                                              AS last_thread_title
+		FROM subcategories s
+		LEFT JOIN threads t ON t.subcategory_id = s.id
+		WHERE s.id IN (%s)
+		GROUP BY s.id`, ph)
+
+	rows, err := s.db.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, fmt.Errorf("subcategory stats batch: %w", err)
+	}
+	defer rows.Close()
+
+	result := make(map[int64]*store.SubcategoryStats, len(subcategoryIDs))
+	for rows.Next() {
+		var stat store.SubcategoryStats
+		var lastPostAt dbNullTime
+		if err := rows.Scan(
+			&stat.SubcategoryID,
+			&stat.ThreadCount,
+			&stat.PostCount,
+			&lastPostAt,
+			&stat.LastPostUsername,
+			&stat.LastThreadTitle,
+		); err != nil {
+			return nil, fmt.Errorf("scan subcategory stats: %w", err)
+		}
+		if lastPostAt.T != nil {
+			stat.LastPostAt = *lastPostAt.T
+		}
+		result[stat.SubcategoryID] = &stat
+	}
+	return result, rows.Err()
 }

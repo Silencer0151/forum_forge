@@ -1,0 +1,62 @@
+{{define "content"}}
+<nav class="ff-breadcrumbs" aria-label="Breadcrumb">
+    <ol class="ff-breadcrumbs__list">
+        <li class="ff-breadcrumbs__item"><a href="/">Forum Home</a></li>
+        <li class="ff-breadcrumbs__item ff-breadcrumbs__item--current" aria-current="page">{{.Category.Name}}</li>
+    </ol>
+</nav>
+
+<div class="ff-page-header">
+    <h1 class="ff-page-header__title">{{.Category.Name}}</h1>
+    {{if .Category.Description}}
+    <p class="ff-page-header__sub">{{.Category.Description}}</p>
+    {{end}}
+</div>
+
+{{if .Subcategories}}
+<div class="ff-category-card">
+    <div class="ff-subcategory-list">
+        {{range .Subcategories}}
+        <div class="ff-subcategory-row">
+            <div class="ff-subcategory-row__info">
+                <a class="ff-subcategory-row__name" href="/c/{{$.Category.Slug}}/{{.Sub.Slug}}">{{.Sub.Name}}</a>
+                {{if .Sub.Description}}
+                <p class="ff-subcategory-row__desc">{{.Sub.Description}}</p>
+                {{end}}
+            </div>
+
+            <div class="ff-subcategory-row__stats">
+                {{if .Stats}}
+                <span class="ff-stat">{{pluralize .Stats.ThreadCount "thread" "threads"}}</span>
+                <span class="ff-stat">{{pluralize .Stats.PostCount "post" "posts"}}</span>
+                {{else}}
+                <span class="ff-stat">0 threads</span>
+                <span class="ff-stat">0 posts</span>
+                {{end}}
+            </div>
+
+            <div class="ff-subcategory-row__last-post">
+                {{if and .Stats (gt .Stats.ThreadCount 0)}}
+                <div class="ff-last-post">
+                    {{if .Stats.LastPostUsername}}
+                    <span class="ff-last-post__by">{{.Stats.LastPostUsername}}</span>
+                    {{end}}
+                    {{if .Stats.LastThreadTitle}}
+                    <a class="ff-last-post__title" href="/c/{{$.Category.Slug}}/{{.Sub.Slug}}">{{truncate .Stats.LastThreadTitle 50}}</a>
+                    {{end}}
+                    <span class="ff-last-post__time">{{formatTime .Stats.LastPostAt}}</span>
+                </div>
+                {{else}}
+                <span class="ff-text-muted ff-text-sm">No posts yet</span>
+                {{end}}
+            </div>
+        </div>
+        {{end}}
+    </div>
+</div>
+{{else}}
+<div class="ff-card">
+    <p class="ff-text-muted">No subcategories in this category yet.</p>
+</div>
+{{end}}
+{{end}}

@@ -73,6 +73,16 @@ type UserStore interface {
 	UnbanUser(ctx context.Context, userID int64) error
 }
 
+// SubcategoryStats holds aggregate stats for a subcategory for display on listing pages.
+type SubcategoryStats struct {
+	SubcategoryID    int64
+	ThreadCount      int
+	PostCount        int
+	LastPostAt       time.Time // zero value means no posts
+	LastPostUsername string    // empty means no posts
+	LastThreadTitle  string    // empty means no posts
+}
+
 // CategoryStore handles categories and subcategories.
 type CategoryStore interface {
 	CreateCategory(ctx context.Context, c *model.Category) error
@@ -90,6 +100,10 @@ type CategoryStore interface {
 	DeleteSubcategory(ctx context.Context, id int64) error
 	ListSubcategoriesByCategoryID(ctx context.Context, categoryID int64) ([]*model.Subcategory, error)
 	ReorderSubcategories(ctx context.Context, ids []int64) error
+
+	// GetSubcategoryStatsBatch returns thread/post counts and last-post info for
+	// multiple subcategories in a single query. Returns an empty map for empty input.
+	GetSubcategoryStatsBatch(ctx context.Context, subcategoryIDs []int64) (map[int64]*SubcategoryStats, error)
 }
 
 // ThreadStore handles thread persistence and counters.

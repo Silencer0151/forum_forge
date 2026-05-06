@@ -48,7 +48,8 @@ type Server struct {
 	handler       http.Handler
 	authenticator auth.Authenticator
 
-	authHandlers *handler.AuthHandlers
+	authHandlers     *handler.AuthHandlers
+	categoryHandlers *handler.CategoryHandlers
 }
 
 // AuthDeps bundles the auth-flow building blocks the server needs but does
@@ -89,6 +90,7 @@ func New(cfg *config.Config, st store.Store, r *render.Renderer, staticFS fs.FS,
 		authDeps.Service, authDeps.Tokens, authDeps.Mailer, r,
 		handler.AuthConfig{Secure: s.secureCookies(), BaseURL: cfg.BaseURL},
 	)
+	s.categoryHandlers = handler.NewCategory(st, r)
 
 	s.registerRoutes()
 	s.handler = s.wrapMiddleware(s.mux)
@@ -173,16 +175,16 @@ func (s *Server) registerRoutes() {
 		w.Write([]byte("ok"))
 	})
 
-	// Forum index (the only page wired up at this stage; the rest are stubs).
-	s.mux.HandleFunc("GET /{$}", s.handleHome)
+	// Forum index and category pages (Task 4.1).
+	s.mux.HandleFunc("GET /{$}", s.categoryHandlers.Home)
+	s.mux.HandleFunc("GET /c/{category_slug}", s.categoryHandlers.Category)
 
 	// Routes from spec.md §5.3. Real implementations land in later phases;
 	// for now they return 501 Not Implemented so a missing handler shows
 	// up clearly in tests rather than as a silent 404.
 	stub := s.notImplemented
 
-	// Categories & threads
-	s.mux.HandleFunc("GET /c/{category_slug}", stub)
+	// Remaining category & thread routes
 	s.mux.HandleFunc("GET /c/{category_slug}/{sub_slug}", stub)
 	s.mux.HandleFunc("GET /t/{thread_id}", stub)
 	s.mux.HandleFunc("POST /t/{thread_id}/reply", stub)
@@ -245,15 +247,6 @@ func (s *Server) registerRoutes() {
 }
 
 // ── handlers ──────────────────────────────────────────────────────────────────
-
-func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
-	data := handler.BaseData(r)
-	data["Title"] = "Home"
-	if err := s.renderer.Render(w, "home.html", data); err != nil {
-		slog.Error("render home", "error", err)
-		http.Error(w, "internal server error", http.StatusInternalServerError)
-	}
-}
 
 func (s *Server) notImplemented(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, "Not Implemented", http.StatusNotImplemented)
