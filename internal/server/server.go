@@ -18,6 +18,7 @@ import (
 	"golang.org/x/crypto/acme/autocert"
 
 	"github.com/nitro/forum_forge/internal/config"
+	"github.com/nitro/forum_forge/internal/middleware"
 	"github.com/nitro/forum_forge/internal/render"
 	"github.com/nitro/forum_forge/internal/store"
 )
@@ -26,6 +27,13 @@ const (
 	readHeaderTimeout = 10 * time.Second
 	idleTimeout       = 120 * time.Second
 	shutdownTimeout   = 15 * time.Second
+
+	// globalRateLimit / globalRateWindow form a permissive baseline limit
+	// that protects against scrapers and runaway clients without affecting
+	// normal use. Action-specific limits (post/thread create, PMs, reports)
+	// live in their handlers and use additional Limiter instances.
+	globalRateLimit  = 600
+	globalRateWindow = time.Minute
 )
 
 // Server is the composed HTTP server: router + dependencies + lifecycle.
@@ -35,10 +43,11 @@ type Server struct {
 	renderer *render.Renderer
 	staticFS fs.FS
 	mux      *http.ServeMux
+	handler  http.Handler
 }
 
-// New builds a Server with all routes registered. It does not start listening;
-// call Run for that.
+// New builds a Server with all routes registered and wrapped in the standard
+// middleware chain. It does not start listening; call Run for that.
 func New(cfg *config.Config, st store.Store, r *render.Renderer, staticFS fs.FS) *Server {
 	s := &Server{
 		cfg:      cfg,
@@ -48,13 +57,57 @@ func New(cfg *config.Config, st store.Store, r *render.Renderer, staticFS fs.FS)
 		mux:      http.NewServeMux(),
 	}
 	s.registerRoutes()
+	s.handler = s.wrapMiddleware(s.mux)
 	return s
 }
 
-// Handler returns the underlying http.Handler. Useful for tests that drive the
-// router with httptest.NewServer or for embedding the forum into another mux
-// (see spec.md §12.5 "library import" deployment mode).
-func (s *Server) Handler() http.Handler { return s.mux }
+// Handler returns the wrapped http.Handler (mux + middleware chain). Useful
+// for tests that drive the router with httptest.NewServer or for embedding
+// the forum into another mux (see spec.md §12.5 "library import" mode).
+func (s *Server) Handler() http.Handler { return s.handler }
+
+// wrapMiddleware composes the per-request middleware in spec.md §5.2 order.
+// Outer→inner: Proxy (normalize r.RemoteAddr/scheme, set HSTS) → Auth (resolve
+// user from session) → Logging (so user_id is available) → RateLimit (per
+// user/IP, after auth so the key reflects the real identity) → CSRF (reject
+// missing/mismatched tokens on unsafe methods) → mux.
+func (s *Server) wrapMiddleware(h http.Handler) http.Handler {
+	limiter := middleware.NewLimiter(globalRateLimit, globalRateWindow)
+	return middleware.Chain(
+		middleware.Proxy(middleware.ProxyConfig{
+			TrustProxy: s.cfg.TrustProxy,
+			HSTSValue:  s.hstsValue(),
+		}),
+		middleware.Auth(s.store),
+		middleware.Logging(slog.Default()),
+		middleware.RateLimit(limiter),
+		middleware.CSRF(middleware.CSRFConfig{Secure: s.secureCookies()}),
+	)(h)
+}
+
+// secureCookies decides whether to mark cookies Secure. Self-terminating TLS
+// modes always serve HTTPS; behind a proxy we trust X-Forwarded-Proto. In
+// plain mode (TLS_MODE=none, no trust_proxy) cookies must NOT be Secure or
+// browsers won't send them back over HTTP.
+func (s *Server) secureCookies() bool {
+	if s.cfg.TLSMode == "autocert" || s.cfg.TLSMode == "manual" {
+		return true
+	}
+	return s.cfg.TrustProxy && strings.HasPrefix(strings.ToLower(s.cfg.BaseURL), "https://")
+}
+
+// hstsValue is the Strict-Transport-Security value to send. Empty in plain
+// dev mode so a developer hitting localhost on http isn't locked into https
+// for the whole apex domain by an over-eager browser.
+func (s *Server) hstsValue() string {
+	if s.cfg.TLSMode == "autocert" || s.cfg.TLSMode == "manual" {
+		return middleware.DefaultHSTS
+	}
+	if s.cfg.TrustProxy {
+		return middleware.DefaultHSTS
+	}
+	return ""
+}
 
 // Run starts the HTTP server in the configured TLS mode and blocks until ctx
 // is canceled. On cancellation it triggers a graceful shutdown.
@@ -244,7 +297,7 @@ func (s *Server) runAutocert(ctx context.Context) error {
 func (s *Server) newHTTPServer(addr string) *http.Server {
 	return &http.Server{
 		Addr:              addr,
-		Handler:           s.mux,
+		Handler:           s.handler,
 		ReadHeaderTimeout: readHeaderTimeout,
 		IdleTimeout:       idleTimeout,
 	}
