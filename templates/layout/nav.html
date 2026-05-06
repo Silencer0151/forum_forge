@@ -1,0 +1,31 @@
+{{define "nav"}}
+<nav class="ff-nav">
+    <div class="ff-container ff-nav__inner">
+        <a class="ff-nav__brand" href="/">ForumForge</a>
+        <button class="ff-nav__toggle" aria-label="Toggle navigation" aria-expanded="false" aria-controls="ff-nav-links" onclick="this.setAttribute('aria-expanded', this.getAttribute('aria-expanded') === 'true' ? 'false' : 'true'); document.getElementById('ff-nav-links').classList.toggle('ff-nav__links--open')">
+            <span></span><span></span><span></span>
+        </button>
+        <div class="ff-nav__links" id="ff-nav-links">
+            <a class="ff-nav__link" href="/">Forum Home</a>
+            <a class="ff-nav__link" href="/search">Search</a>
+            {{if .User}}
+            <div class="ff-nav__user">
+                <span class="ff-nav__username">{{.User.Username}}</span>
+                <div class="ff-nav__dropdown">
+                    <a class="ff-nav__dropdown-item" href="/u/{{.User.Username}}">Profile</a>
+                    <a class="ff-nav__dropdown-item" href="/pm/inbox">Messages</a>
+                    <a class="ff-nav__dropdown-item" href="/settings">Settings</a>
+                    {{if eq .User.Role "admin"}}
+                    <a class="ff-nav__dropdown-item" href="/admin">Admin Panel</a>
+                    {{end}}
+                    <a class="ff-nav__dropdown-item ff-nav__dropdown-item--danger" href="/auth/logout">Log Out</a>
+                </div>
+            </div>
+            {{else}}
+            <a class="ff-nav__link" href="/auth/login">Login</a>
+            <a class="ff-nav__link ff-nav__link--cta" href="/auth/register">Register</a>
+            {{end}}
+        </div>
+    </div>
+</nav>
+{{end}}
