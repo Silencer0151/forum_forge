@@ -18,7 +18,10 @@
                     {{if eq .User.Role "admin"}}
                     <a class="ff-nav__dropdown-item" href="/admin">Admin Panel</a>
                     {{end}}
-                    <a class="ff-nav__dropdown-item ff-nav__dropdown-item--danger" href="/auth/logout">Log Out</a>
+                    <form class="ff-nav__logout-form" method="post" action="/auth/logout">
+                        <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+                        <button type="submit" class="ff-nav__dropdown-item ff-nav__dropdown-item--danger">Log Out</button>
+                    </form>
                 </div>
             </div>
             {{else}}

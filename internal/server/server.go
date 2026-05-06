@@ -17,7 +17,9 @@ import (
 
 	"golang.org/x/crypto/acme/autocert"
 
+	"github.com/nitro/forum_forge/internal/auth"
 	"github.com/nitro/forum_forge/internal/config"
+	"github.com/nitro/forum_forge/internal/handler"
 	"github.com/nitro/forum_forge/internal/middleware"
 	"github.com/nitro/forum_forge/internal/render"
 	"github.com/nitro/forum_forge/internal/store"
@@ -44,6 +46,8 @@ type Server struct {
 	staticFS fs.FS
 	mux      *http.ServeMux
 	handler  http.Handler
+
+	authHandlers *handler.AuthHandlers
 }
 
 // New builds a Server with all routes registered and wrapped in the standard
@@ -56,6 +60,10 @@ func New(cfg *config.Config, st store.Store, r *render.Renderer, staticFS fs.FS)
 		staticFS: staticFS,
 		mux:      http.NewServeMux(),
 	}
+
+	authSvc := auth.New(st)
+	s.authHandlers = handler.NewAuth(authSvc, r, handler.AuthConfig{Secure: s.secureCookies()})
+
 	s.registerRoutes()
 	s.handler = s.wrapMiddleware(s.mux)
 	return s
@@ -177,12 +185,15 @@ func (s *Server) registerRoutes() {
 	// Search
 	s.mux.HandleFunc("GET /search", stub)
 
-	// Auth
-	s.mux.HandleFunc("GET /auth/login", stub)
-	s.mux.HandleFunc("POST /auth/login", stub)
-	s.mux.HandleFunc("GET /auth/register", stub)
-	s.mux.HandleFunc("POST /auth/register", stub)
-	s.mux.HandleFunc("POST /auth/logout", stub)
+	// Auth (standalone email+password — see internal/handler/auth.go).
+	// Task 3.3 will route these through an AuthAdapter so integrated mode
+	// can swap a different implementation without touching server.go.
+	s.mux.HandleFunc("GET /auth/login", s.authHandlers.LoginPage)
+	s.mux.HandleFunc("POST /auth/login", s.authHandlers.Login)
+	s.mux.HandleFunc("GET /auth/register", s.authHandlers.RegisterPage)
+	s.mux.HandleFunc("POST /auth/register", s.authHandlers.Register)
+	s.mux.HandleFunc("POST /auth/logout", s.authHandlers.Logout)
+	// Email verification + password reset land in Task 3.2.
 	s.mux.HandleFunc("GET /auth/verify", stub)
 	s.mux.HandleFunc("GET /auth/forgot-password", stub)
 	s.mux.HandleFunc("POST /auth/forgot-password", stub)
@@ -211,7 +222,8 @@ func (s *Server) registerRoutes() {
 // ── handlers ──────────────────────────────────────────────────────────────────
 
 func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
-	data := map[string]any{"Title": "Home"}
+	data := handler.BaseData(r)
+	data["Title"] = "Home"
 	if err := s.renderer.Render(w, "home.html", data); err != nil {
 		slog.Error("render home", "error", err)
 		http.Error(w, "internal server error", http.StatusInternalServerError)

@@ -1,0 +1,45 @@
+{{define "content"}}
+<div class="ff-page-header">
+    <h1 class="ff-page-header__title">Create Account</h1>
+    <p class="ff-page-header__sub">Pick a username, set a password, and start posting.</p>
+</div>
+
+<div class="ff-card" style="max-width: 480px;">
+    {{if .Error}}
+    <div class="ff-input-error" role="alert" style="margin-bottom: var(--ff-sp-2);">{{.Error}}</div>
+    {{end}}
+
+    <form method="post" action="/auth/register" novalidate>
+        <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+
+        <div class="ff-form-group">
+            <label class="ff-label" for="username">Username</label>
+            <input class="ff-input" type="text" id="username" name="username" value="{{.Username}}"
+                   required autocomplete="username" minlength="3" maxlength="32"
+                   pattern="[A-Za-z0-9_]{3,32}" autofocus>
+            {{with index .FieldErrors "username"}}<span class="ff-input-error">{{.}}</span>{{else}}
+            <span class="ff-input-hint">3–32 characters: letters, numbers, underscore.</span>
+            {{end}}
+        </div>
+
+        <div class="ff-form-group">
+            <label class="ff-label" for="email">Email</label>
+            <input class="ff-input" type="email" id="email" name="email" value="{{.Email}}" required autocomplete="email">
+            {{with index .FieldErrors "email"}}<span class="ff-input-error">{{.}}</span>{{end}}
+        </div>
+
+        <div class="ff-form-group">
+            <label class="ff-label" for="password">Password</label>
+            <input class="ff-input" type="password" id="password" name="password" required autocomplete="new-password" minlength="8">
+            {{with index .FieldErrors "password"}}<span class="ff-input-error">{{.}}</span>{{else}}
+            <span class="ff-input-hint">At least 8 characters.</span>
+            {{end}}
+        </div>
+
+        <div class="ff-form-actions">
+            <button class="ff-btn ff-btn--primary" type="submit">Create account</button>
+            <a class="ff-btn ff-btn--ghost" href="/auth/login">Already have an account?</a>
+        </div>
+    </form>
+</div>
+{{end}}

@@ -237,6 +237,17 @@ hr {
 .ff-nav__dropdown-item--danger:hover {
     color: var(--ff-danger);
 }
+/* Logout dropdown item is a <button> inside a form so submitting goes through
+   POST + CSRF. Reset button chrome so it looks identical to the <a> items above. */
+.ff-nav__logout-form { margin: 0; }
+.ff-nav__logout-form button.ff-nav__dropdown-item {
+    width: 100%;
+    text-align: left;
+    background: none;
+    border: 0;
+    font: inherit;
+    cursor: pointer;
+}
 
 /* Hamburger toggle — hidden on desktop */
 .ff-nav__toggle {
