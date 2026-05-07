@@ -53,6 +53,7 @@ type Server struct {
 	threadHandlers   *handler.ThreadHandlers
 	postHandlers     *handler.PostHandlers
 	userHandlers     *handler.UserHandlers
+	settingsHandlers *handler.SettingsHandlers
 }
 
 // AuthDeps bundles the auth-flow building blocks the server needs but does
@@ -97,6 +98,10 @@ func New(cfg *config.Config, st store.Store, r *render.Renderer, staticFS fs.FS,
 	s.threadHandlers = handler.NewThreadHandler(st, r)
 	s.postHandlers = handler.NewPostHandler(st, r)
 	s.userHandlers = handler.NewUserHandler(st, r)
+	s.settingsHandlers = handler.NewSettingsHandler(st, r, authDeps.Service, cfg.UploadPath, handler.SettingsConfig{
+		Secure:         s.secureCookies(),
+		IntegratedMode: cfg.AuthMode == "integrated",
+	})
 
 	s.registerRoutes()
 	s.handler = s.wrapMiddleware(s.mux)
@@ -175,6 +180,10 @@ func (s *Server) registerRoutes() {
 		cacheStatic(http.FileServer(http.FS(s.staticFS))))
 	s.mux.Handle("GET /static/", staticHandler)
 
+	// User-uploaded files (avatars, etc.) served from the upload directory on disk.
+	uploadsHandler := http.StripPrefix("/uploads/", http.FileServer(http.Dir(s.cfg.UploadPath)))
+	s.mux.Handle("GET /uploads/", uploadsHandler)
+
 	// Health check (referenced from spec.md §9.2 for Docker readiness).
 	s.mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
@@ -214,8 +223,8 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("GET /u/{username}/posts", s.userHandlers.UserPostsPage)
 	s.mux.HandleFunc("POST /u/{username}/ban", s.userHandlers.BanUser)
 	s.mux.HandleFunc("POST /u/{username}/unban", s.userHandlers.UnbanUser)
-	s.mux.HandleFunc("GET /settings", stub)
-	s.mux.HandleFunc("POST /settings", stub)
+	s.mux.HandleFunc("GET /settings", s.settingsHandlers.SettingsPage)
+	s.mux.HandleFunc("POST /settings", s.settingsHandlers.UpdateSettings)
 
 	// Private messages
 	s.mux.HandleFunc("GET /pm", stub)

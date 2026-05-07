@@ -1,0 +1,145 @@
+{{define "content"}}
+<nav class="ff-breadcrumbs" aria-label="Breadcrumb">
+    <ol class="ff-breadcrumbs__list">
+        <li class="ff-breadcrumbs__item"><a href="/">Forum Home</a></li>
+        <li class="ff-breadcrumbs__item"><a href="/u/{{.SettingsUser.Username}}">{{.SettingsUser.DisplayNameOrUsername}}</a></li>
+        <li class="ff-breadcrumbs__item ff-breadcrumbs__item--current" aria-current="page">Settings</li>
+    </ol>
+</nav>
+
+<div class="ff-page-header">
+    <h1 class="ff-page-header__title">Account Settings</h1>
+</div>
+
+{{if .Notice}}
+<div class="ff-alert ff-alert--success" role="status">{{.Notice}}</div>
+{{end}}
+{{if .Error}}
+<div class="ff-alert ff-alert--error" role="alert">{{.Error}}</div>
+{{end}}
+
+{{/* ── Profile section ──────────────────────────────────────────────────────── */}}
+<div class="ff-card ff-mt-2">
+    <h2 style="margin-bottom:var(--ff-sp-3);">Profile</h2>
+
+    <form method="POST" action="/settings" enctype="multipart/form-data">
+        <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+        <input type="hidden" name="section" value="profile">
+
+        {{/* Avatar */}}
+        {{if not .IntegratedMode}}
+        <div class="ff-form-group">
+            <label class="ff-label">Avatar</label>
+            <div style="display:flex;align-items:center;gap:var(--ff-sp-3);flex-wrap:wrap;margin-bottom:var(--ff-sp-2);">
+                <img id="avatar-preview"
+                     style="width:64px;height:64px;border-radius:var(--ff-avatar-radius);object-fit:cover;border:1px solid var(--ff-border);"
+                     src="{{if .SettingsUser.AvatarURL}}{{.SettingsUser.AvatarURL}}{{else}}{{gravatar .SettingsUser.Email}}{{end}}"
+                     alt="Current avatar">
+                <div style="flex:1;min-width:200px;">
+                    <label class="ff-label" for="avatar" style="font-weight:normal;margin-bottom:var(--ff-sp-1);">Upload image (JPEG, PNG, or GIF — max 2 MB)</label>
+                    <input class="ff-input" type="file" id="avatar" name="avatar"
+                           accept="image/jpeg,image/png,image/gif"
+                           onchange="previewAvatar(this)">
+                </div>
+            </div>
+            <label class="ff-label" for="avatar_url" style="font-weight:normal;">Or paste an image URL</label>
+            <input class="ff-input" type="url" id="avatar_url" name="avatar_url"
+                   value="{{.SettingsUser.AvatarURL}}"
+                   placeholder="https://example.com/avatar.jpg"
+                   style="margin-top:var(--ff-sp-1);">
+            <span class="ff-input-hint">File upload takes priority over URL. Leave blank to keep the current avatar.</span>
+        </div>
+        {{else}}
+        <div class="ff-form-group">
+            <label class="ff-label">Avatar</label>
+            <p class="ff-text-muted" style="margin:0;">Your avatar is managed by your account provider and cannot be changed here.</p>
+        </div>
+        {{end}}
+
+        {{/* Display name */}}
+        <div class="ff-form-group">
+            <label class="ff-label" for="display_name">Display Name</label>
+            <input class="ff-input" type="text" id="display_name" name="display_name"
+                   value="{{.SettingsUser.DisplayName}}"
+                   maxlength="50"
+                   placeholder="Leave blank to use your username">
+            <span class="ff-input-hint">Shown instead of your username. Max 50 characters.</span>
+        </div>
+
+        {{/* Signature */}}
+        <div class="ff-form-group">
+            <label class="ff-label" for="signature">Signature <span id="sig-counter" class="ff-text-muted" style="font-weight:normal;font-size:0.85em;">({{len .SettingsUser.Signature}}/256)</span></label>
+            <textarea class="ff-textarea" id="signature" name="signature"
+                      rows="3"
+                      maxlength="256"
+                      placeholder="Appears below your posts..."
+                      oninput="updateCounter(this,'sig-counter',256)">{{.SettingsUser.Signature}}</textarea>
+            <span class="ff-input-hint">Shown below your posts. Max 256 characters.</span>
+        </div>
+
+        <div class="ff-form-actions">
+            <button type="submit" class="ff-btn ff-btn--primary">Save Profile</button>
+            <a href="/u/{{.SettingsUser.Username}}" class="ff-btn ff-btn--ghost">Cancel</a>
+        </div>
+    </form>
+</div>
+
+{{/* ── Password section ─────────────────────────────────────────────────────── */}}
+{{if not .IntegratedMode}}
+<div class="ff-card ff-mt-2">
+    <h2 style="margin-bottom:var(--ff-sp-3);">Change Password</h2>
+
+    <form method="POST" action="/settings">
+        <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+        <input type="hidden" name="section" value="password">
+
+        <div class="ff-form-group">
+            <label class="ff-label" for="current_password">Current Password</label>
+            <input class="ff-input" type="password" id="current_password" name="current_password"
+                   autocomplete="current-password" required>
+        </div>
+
+        <div class="ff-form-group">
+            <label class="ff-label" for="new_password">New Password</label>
+            <input class="ff-input" type="password" id="new_password" name="new_password"
+                   autocomplete="new-password" minlength="8" required>
+            <span class="ff-input-hint">At least 8 characters.</span>
+        </div>
+
+        <div class="ff-form-group">
+            <label class="ff-label" for="confirm_password">Confirm New Password</label>
+            <input class="ff-input" type="password" id="confirm_password" name="confirm_password"
+                   autocomplete="new-password" minlength="8" required>
+        </div>
+
+        <div class="ff-form-actions">
+            <button type="submit" class="ff-btn ff-btn--primary">Update Password</button>
+        </div>
+        <p class="ff-text-muted" style="margin-top:var(--ff-sp-2);font-size:0.875rem;">
+            Changing your password will sign you out of all devices.
+        </p>
+    </form>
+</div>
+{{else}}
+<div class="ff-card ff-mt-2">
+    <h2 style="margin-bottom:var(--ff-sp-2);">Password</h2>
+    <p class="ff-text-muted">Your password is managed by your account provider.</p>
+</div>
+{{end}}
+
+<script>
+function previewAvatar(input) {
+    if (!input.files || !input.files[0]) return;
+    var reader = new FileReader();
+    reader.onload = function(e) {
+        document.getElementById('avatar-preview').src = e.target.result;
+    };
+    reader.readAsDataURL(input.files[0]);
+}
+
+function updateCounter(textarea, counterId, max) {
+    var el = document.getElementById(counterId);
+    if (el) el.textContent = '(' + textarea.value.length + '/' + max + ')';
+}
+</script>
+{{end}}
