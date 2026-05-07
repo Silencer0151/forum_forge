@@ -52,6 +52,7 @@ type Server struct {
 	categoryHandlers *handler.CategoryHandlers
 	threadHandlers   *handler.ThreadHandlers
 	postHandlers     *handler.PostHandlers
+	userHandlers     *handler.UserHandlers
 }
 
 // AuthDeps bundles the auth-flow building blocks the server needs but does
@@ -95,6 +96,7 @@ func New(cfg *config.Config, st store.Store, r *render.Renderer, staticFS fs.FS,
 	s.categoryHandlers = handler.NewCategory(st, r)
 	s.threadHandlers = handler.NewThreadHandler(st, r)
 	s.postHandlers = handler.NewPostHandler(st, r)
+	s.userHandlers = handler.NewUserHandler(st, r)
 
 	s.registerRoutes()
 	s.handler = s.wrapMiddleware(s.mux)
@@ -207,9 +209,11 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("POST /p/{post_id}/quote", s.postHandlers.QuotePost)
 	s.mux.HandleFunc("POST /p/{post_id}/report", stub)
 
-	// Users
-	s.mux.HandleFunc("GET /u/{username}", stub)
-	s.mux.HandleFunc("GET /u/{username}/posts", stub)
+	// Users (Task 5.1).
+	s.mux.HandleFunc("GET /u/{username}", s.userHandlers.ProfilePage)
+	s.mux.HandleFunc("GET /u/{username}/posts", s.userHandlers.UserPostsPage)
+	s.mux.HandleFunc("POST /u/{username}/ban", s.userHandlers.BanUser)
+	s.mux.HandleFunc("POST /u/{username}/unban", s.userHandlers.UnbanUser)
 	s.mux.HandleFunc("GET /settings", stub)
 	s.mux.HandleFunc("POST /settings", stub)
 

@@ -1,0 +1,109 @@
+{{define "content"}}
+<div class="ff-profile">
+
+<nav class="ff-breadcrumbs" aria-label="Breadcrumb">
+    <ol class="ff-breadcrumbs__list">
+        <li class="ff-breadcrumbs__item"><a href="/">Forum Home</a></li>
+        <li class="ff-breadcrumbs__item ff-breadcrumbs__item--current" aria-current="page">{{.ProfileUser.DisplayNameOrUsername}}</li>
+    </ol>
+</nav>
+
+<div class="ff-profile__header ff-card" style="display:flex;align-items:flex-start;gap:var(--ff-sp-3);flex-wrap:wrap;">
+    <img class="ff-avatar"
+         style="width:96px;height:96px;border-radius:var(--ff-avatar-radius);flex-shrink:0;"
+         src="{{if .ProfileUser.AvatarURL}}{{.ProfileUser.AvatarURL}}{{else}}{{gravatar .ProfileUser.Email}}{{end}}"
+         alt="{{.ProfileUser.Username}}'s avatar"
+         loading="lazy">
+
+    <div style="flex:1;min-width:200px;">
+        <div style="display:flex;align-items:center;gap:var(--ff-sp-1);flex-wrap:wrap;">
+            <h1 style="margin-bottom:0;">{{.ProfileUser.DisplayNameOrUsername}}</h1>
+            <span class="ff-role-badge ff-role-badge--{{.ProfileUser.Role}}">{{.ProfileUser.Role}}</span>
+            {{if .ProfileUser.Banned}}
+            <span class="ff-role-badge" style="background:var(--ff-danger);color:#fff;">Banned</span>
+            {{end}}
+        </div>
+        {{if .ProfileUser.DisplayName}}
+        <p class="ff-text-muted" style="margin-top:2px;">@{{.ProfileUser.Username}}</p>
+        {{end}}
+
+        <div class="ff-profile__stats" style="display:flex;gap:var(--ff-sp-3);margin-top:var(--ff-sp-2);flex-wrap:wrap;">
+            <div>
+                <span style="font-weight:600;color:var(--ff-accent);">{{.ProfileUser.PostCount}}</span>
+                <span class="ff-text-muted"> posts</span>
+            </div>
+            <div>
+                <span class="ff-text-muted">Joined </span>
+                <span>{{formatTime .ProfileUser.CreatedAt}}</span>
+            </div>
+            <div>
+                <span class="ff-text-muted">Last seen </span>
+                <span>{{formatTime .ProfileUser.LastSeenAt}}</span>
+            </div>
+        </div>
+
+        {{if .ProfileUser.Signature}}
+        <div class="ff-profile__signature ff-text-muted" style="margin-top:var(--ff-sp-2);padding-top:var(--ff-sp-1);border-top:1px solid var(--ff-border);font-size:0.875rem;white-space:pre-wrap;">{{.ProfileUser.Signature}}</div>
+        {{end}}
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:var(--ff-sp-1);flex-shrink:0;">
+        {{if .IsOwnProfile}}
+        <a href="/settings" class="ff-btn ff-btn--secondary ff-btn--sm">Edit Profile</a>
+        {{end}}
+        {{if .CanSendPM}}
+        <a href="/pm/new?to={{.ProfileUser.Username}}" class="ff-btn ff-btn--ghost ff-btn--sm">Send PM</a>
+        {{end}}
+    </div>
+</div>
+
+{{if .CanMod}}
+<div class="ff-card ff-mt-2">
+    <h3 style="margin-bottom:var(--ff-sp-2);">Moderator Actions</h3>
+    {{if .ProfileUser.Banned}}
+    <form method="POST" action="/u/{{.ProfileUser.Username}}/unban"
+          onsubmit="return confirm('Unban {{.ProfileUser.Username}}?')">
+        <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+        <button type="submit" class="ff-btn ff-btn--secondary ff-btn--sm">Unban User</button>
+    </form>
+    {{else}}
+    <form method="POST" action="/u/{{.ProfileUser.Username}}/ban" style="display:flex;gap:var(--ff-sp-1);align-items:flex-end;flex-wrap:wrap;">
+        <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+        <div style="flex:1;min-width:200px;">
+            <label class="ff-label" for="ban-reason">Reason</label>
+            <input class="ff-input" id="ban-reason" name="reason" type="text" placeholder="Ban reason (optional)" style="width:100%;">
+        </div>
+        <button type="submit" class="ff-btn ff-btn--danger ff-btn--sm"
+                onclick="return confirm('Ban {{.ProfileUser.Username}}?')">Ban User</button>
+    </form>
+    {{end}}
+</div>
+{{end}}
+
+<div class="ff-card ff-mt-2">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--ff-sp-2);">
+        <h2 style="margin-bottom:0;">Recent Posts</h2>
+        {{if gt .TotalPosts 0}}
+        <a href="/u/{{.ProfileUser.Username}}/posts" class="ff-btn ff-btn--ghost ff-btn--sm">View all {{.TotalPosts}} posts &raquo;</a>
+        {{end}}
+    </div>
+
+    {{if .RecentPosts}}
+    <div class="ff-post-history">
+        {{range .RecentPosts}}
+        <div class="ff-post-history__item" style="padding:var(--ff-sp-2) 0;border-bottom:1px solid var(--ff-border);">
+            <div style="margin-bottom:var(--ff-sp-1);">
+                <a href="/t/{{.Thread.ID}}#post-{{.Post.ID}}" style="font-weight:600;">{{truncate .Thread.Title 80}}</a>
+                <span class="ff-text-muted" style="font-size:0.85rem;margin-left:var(--ff-sp-1);">{{formatTime .Post.CreatedAt}}</span>
+            </div>
+            <p class="ff-text-muted" style="font-size:0.9rem;margin:0;">{{truncate .Post.Body 200}}</p>
+        </div>
+        {{end}}
+    </div>
+    {{else}}
+    <p class="ff-text-muted">No posts yet.</p>
+    {{end}}
+</div>
+
+</div>{{/* .ff-profile */}}
+{{end}}

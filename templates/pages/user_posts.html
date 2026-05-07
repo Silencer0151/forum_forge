@@ -1,0 +1,48 @@
+{{define "content"}}
+<div id="posts-content">
+
+<nav class="ff-breadcrumbs" aria-label="Breadcrumb">
+    <ol class="ff-breadcrumbs__list">
+        <li class="ff-breadcrumbs__item"><a href="/">Forum Home</a></li>
+        <li class="ff-breadcrumbs__item"><a href="/u/{{.ProfileUser.Username}}">{{.ProfileUser.DisplayNameOrUsername}}</a></li>
+        <li class="ff-breadcrumbs__item ff-breadcrumbs__item--current" aria-current="page">Post History</li>
+    </ol>
+</nav>
+
+<div class="ff-page-header">
+    <h1 class="ff-page-header__title">Posts by {{.ProfileUser.DisplayNameOrUsername}}</h1>
+    <p class="ff-page-header__sub">
+        <a href="/u/{{.ProfileUser.Username}}">&#8592; Back to profile</a>
+    </p>
+</div>
+
+{{template "pagination" .Pagination}}
+
+{{if .Posts}}
+<div class="ff-card ff-mt-2">
+    {{range .Posts}}
+    <div class="ff-post-history__item" style="padding:var(--ff-sp-2) 0;border-bottom:1px solid var(--ff-border);">
+        <div style="margin-bottom:var(--ff-sp-1);display:flex;align-items:baseline;gap:var(--ff-sp-1);flex-wrap:wrap;">
+            <a href="/t/{{.Thread.ID}}#post-{{.Post.ID}}" style="font-weight:600;">{{truncate .Thread.Title 100}}</a>
+            <span class="ff-text-muted" style="font-size:0.85rem;">{{formatTime .Post.CreatedAt}}</span>
+            {{if .Post.EditCount}}
+            <span class="ff-text-muted" style="font-size:0.8rem;">(edited)</span>
+            {{end}}
+        </div>
+        <p class="ff-text-muted" style="font-size:0.9rem;margin:0;">{{truncate .Post.Body 300}}</p>
+        <div style="margin-top:var(--ff-sp-1);">
+            <a href="/t/{{.Thread.ID}}#post-{{.Post.ID}}" class="ff-btn ff-btn--ghost ff-btn--sm" style="font-size:0.8rem;">View in thread &raquo;</a>
+        </div>
+    </div>
+    {{end}}
+</div>
+{{else}}
+<div class="ff-card ff-mt-2">
+    <p class="ff-text-muted">No posts yet.</p>
+</div>
+{{end}}
+
+{{template "pagination" .Pagination}}
+
+</div>{{/* #posts-content */}}
+{{end}}
