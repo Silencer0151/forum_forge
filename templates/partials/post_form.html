@@ -27,7 +27,7 @@
                           name="body"
                           rows="8"
                           placeholder="Write your reply here..."
-                          required></textarea>
+                          required>{{if .QuoteText}}{{.QuoteText}}{{end}}</textarea>
             </div>
 
             <div class="ff-form-actions">

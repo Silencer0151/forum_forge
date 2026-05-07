@@ -204,7 +204,7 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("DELETE /p/{post_id}", s.postHandlers.DeletePost)
 	s.mux.HandleFunc("POST /p/{post_id}", s.postHandlers.PostMethodOverride)
 	s.mux.HandleFunc("POST /p/{post_id}/react", s.postHandlers.ReactToPost)
-	s.mux.HandleFunc("POST /p/{post_id}/quote", stub)
+	s.mux.HandleFunc("POST /p/{post_id}/quote", s.postHandlers.QuotePost)
 	s.mux.HandleFunc("POST /p/{post_id}/report", stub)
 
 	// Users

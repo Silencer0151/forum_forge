@@ -66,6 +66,13 @@
                 </div>
 
                 <div class="ff-post__action-btns">
+                    {{if .CanQuote}}
+                    <a class="ff-btn ff-btn--ghost ff-btn--sm"
+                       href="/t/{{.Post.ThreadID}}?quote={{.Post.ID}}"
+                       hx-post="/p/{{.Post.ID}}/quote"
+                       hx-swap="none"
+                       hx-on:htmx:after-request="if(event.detail.successful){var ta=document.getElementById('reply-body');ta.value=event.detail.xhr.responseText+(ta.value?ta.value:'');ta.scrollIntoView({behavior:'smooth'})}">Quote</a>
+                    {{end}}
                     {{if .CanEdit}}
                     <a class="ff-btn ff-btn--ghost ff-btn--sm"
                        href="/p/{{.Post.ID}}/edit"

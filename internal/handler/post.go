@@ -41,6 +41,7 @@ type PostDisplayRow struct {
 	CanDelete      bool
 	CanReport      bool
 	CanReact       bool
+	CanQuote       bool
 }
 
 // ThreadPage serves GET /t/{thread_id}: paginated posts with reply form.
@@ -160,6 +161,7 @@ func (h *PostHandlers) ThreadPage(w http.ResponseWriter, r *http.Request) {
 			CanDelete:      isMod,
 			CanReport:      user != nil && !isAuthor && !p.Post.IsDeleted,
 			CanReact:       user != nil && !user.Banned && !p.Post.IsDeleted,
+			CanQuote:       user != nil && !p.Post.IsDeleted,
 		}
 
 		if p.Post.IsDeleted && p.Post.EditedBy != nil {
@@ -177,6 +179,19 @@ func (h *PostHandlers) ThreadPage(w http.ResponseWriter, r *http.Request) {
 	canReply := user != nil && !user.Banned && !thread.IsLocked && user.Role != model.RoleGuest
 	canMod := user != nil && user.Role.CanModerate()
 
+	quoteText := ""
+	if quoteIDStr := r.URL.Query().Get("quote"); quoteIDStr != "" {
+		if quoteID, err2 := strconv.ParseInt(quoteIDStr, 10, 64); err2 == nil {
+			if qPost, err2 := h.store.GetPostByID(ctx, quoteID); err2 == nil && !qPost.IsDeleted {
+				qUsername := "unknown"
+				if qAuthor, err2 := h.store.GetUserByID(ctx, qPost.AuthorID); err2 == nil {
+					qUsername = qAuthor.DisplayNameOrUsername()
+				}
+				quoteText = buildQuoteText(qUsername, qPost.Body)
+			}
+		}
+	}
+
 	data := BaseData(r)
 	data["Title"] = thread.Title
 	data["Thread"] = thread
@@ -188,6 +203,7 @@ func (h *PostHandlers) ThreadPage(w http.ResponseWriter, r *http.Request) {
 	data["CanReply"] = canReply
 	data["CanMod"] = canMod
 	data["FormFormat"] = string(model.BodyFormatMarkdown)
+	data["QuoteText"] = quoteText
 
 	if render.IsHTMXRequest(r) {
 		if err := h.renderer.RenderContent(w, "thread.html", data); err != nil {
@@ -346,6 +362,7 @@ func (h *PostHandlers) buildSinglePostRow(ctx context.Context, post *model.Post,
 		CanDelete:      isMod,
 		CanReport:      user != nil && !isAuthor && !post.IsDeleted,
 		CanReact:       user != nil && !user.Banned && !post.IsDeleted,
+		CanQuote:       user != nil && !post.IsDeleted,
 	}
 
 	if post.IsDeleted && post.EditedBy != nil {
@@ -357,6 +374,72 @@ func (h *PostHandlers) buildSinglePostRow(ctx context.Context, post *model.Post,
 	}
 
 	return row, nil
+}
+
+// buildQuoteText formats a post body into a markdown block-quote attributed to username.
+// The body is truncated to 500 characters if longer.
+func buildQuoteText(username, body string) string {
+	if len([]rune(body)) > 500 {
+		runes := []rune(body)
+		body = string(runes[:500]) + "..."
+	}
+	lines := strings.Split(body, "\n")
+	var b strings.Builder
+	fmt.Fprintf(&b, "> **%s wrote:**\n", username)
+	for _, line := range lines {
+		fmt.Fprintf(&b, "> %s\n", line)
+	}
+	b.WriteString("\n")
+	return b.String()
+}
+
+// QuotePost handles POST /p/{post_id}/quote.
+// HTMX: returns the formatted quote text as plain text for the client to inject into the reply textarea.
+// Non-HTMX: redirects to the thread page with ?quote={post_id} so ThreadPage pre-fills the textarea.
+func (h *PostHandlers) QuotePost(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	user := middleware.UserFromContext(ctx)
+	if user == nil {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+
+	postID, err := strconv.ParseInt(r.PathValue("post_id"), 10, 64)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	post, err := h.store.GetPostByID(ctx, postID)
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			http.NotFound(w, r)
+			return
+		}
+		slog.Error("get post for quote", "id", postID, "error", err)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	if post.IsDeleted {
+		http.Error(w, "Not Found", http.StatusNotFound)
+		return
+	}
+
+	username := "unknown"
+	if author, err := h.store.GetUserByID(ctx, post.AuthorID); err == nil {
+		username = author.DisplayNameOrUsername()
+	}
+
+	quoteText := buildQuoteText(username, post.Body)
+
+	if render.IsHTMXRequest(r) {
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		fmt.Fprint(w, quoteText)
+		return
+	}
+
+	http.Redirect(w, r, fmt.Sprintf("/t/%d?quote=%d", post.ThreadID, post.ID), http.StatusSeeOther)
 }
 
 // getEditWindowMin loads the edit window setting, falling back to 30 minutes.
