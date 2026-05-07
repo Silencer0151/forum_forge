@@ -2,15 +2,22 @@
 {{if gt .TotalPages 1}}
 <nav class="ff-pagination" aria-label="Pagination">
     {{if .HasPrev}}
-    <a class="ff-pagination__link" href="{{.BaseURL}}?page={{.PrevPage}}" aria-label="Previous page">&laquo;</a>
+    <a class="ff-pagination__link"
+       href="{{.BaseURL}}?page={{.PrevPage}}"
+       {{if .HTMXTarget}}hx-get="{{.BaseURL}}?page={{.PrevPage}}" hx-target="{{.HTMXTarget}}" hx-swap="outerHTML" hx-push-url="true"{{end}}
+       aria-label="Previous page">&laquo;</a>
     {{end}}
     {{range .Pages}}
     <a class="ff-pagination__link{{if eq . $.CurrentPage}} ff-pagination__link--active{{end}}"
        href="{{$.BaseURL}}?page={{.}}"
+       {{if $.HTMXTarget}}hx-get="{{$.BaseURL}}?page={{.}}" hx-target="{{$.HTMXTarget}}" hx-swap="outerHTML" hx-push-url="true"{{end}}
        {{if eq . $.CurrentPage}}aria-current="page"{{end}}>{{.}}</a>
     {{end}}
     {{if .HasNext}}
-    <a class="ff-pagination__link" href="{{.BaseURL}}?page={{.NextPage}}" aria-label="Next page">&raquo;</a>
+    <a class="ff-pagination__link"
+       href="{{.BaseURL}}?page={{.NextPage}}"
+       {{if .HTMXTarget}}hx-get="{{.BaseURL}}?page={{.NextPage}}" hx-target="{{.HTMXTarget}}" hx-swap="outerHTML" hx-push-url="true"{{end}}
+       aria-label="Next page">&raquo;</a>
     {{end}}
 </nav>
 {{end}}

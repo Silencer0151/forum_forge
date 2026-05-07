@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -183,11 +184,18 @@ func (h *PostHandlers) ThreadPage(w http.ResponseWriter, r *http.Request) {
 	data["Subcategory"] = sub
 	data["Posts"] = posts
 	data["PostRows"] = rows
-	data["Pagination"] = buildPagination(posts.Page, posts.TotalPages, baseURL)
+	data["Pagination"] = buildPagination(posts.Page, posts.TotalPages, baseURL, "#thread-wrapper")
 	data["CanReply"] = canReply
 	data["CanMod"] = canMod
 	data["FormFormat"] = string(model.BodyFormatMarkdown)
 
+	if render.IsHTMXRequest(r) {
+		if err := h.renderer.RenderContent(w, "thread.html", data); err != nil {
+			slog.Error("render thread content (htmx)", "thread_id", threadID, "error", err)
+			http.Error(w, "internal server error", http.StatusInternalServerError)
+		}
+		return
+	}
 	if err := h.renderer.Render(w, "thread.html", data); err != nil {
 		slog.Error("render thread page", "thread_id", threadID, "error", err)
 		http.Error(w, "internal server error", http.StatusInternalServerError)
@@ -274,5 +282,399 @@ func (h *PostHandlers) ReplyToThread(w http.ResponseWriter, r *http.Request) {
 		slog.Warn("increment post count", "user_id", user.ID, "error", err)
 	}
 
+	if render.IsHTMXRequest(r) {
+		editWindowMin := 30
+		if settings, err := h.store.GetSettings(ctx); err == nil && settings.EditWindowMinutes > 0 {
+			editWindowMin = settings.EditWindowMinutes
+		}
+		row, err := h.buildSinglePostRow(ctx, post, user, editWindowMin)
+		if err != nil {
+			slog.Error("build reply row", "error", err)
+			http.Error(w, "internal server error", http.StatusInternalServerError)
+			return
+		}
+		if err := h.renderer.RenderPartial(w, "post.html", row); err != nil {
+			slog.Error("render reply partial", "error", err)
+		}
+		return
+	}
+
 	http.Redirect(w, r, fmt.Sprintf("/t/%d#post-%d", threadID, post.ID), http.StatusSeeOther)
+}
+
+// ReactionData holds data for the reaction_button.html partial.
+type ReactionData struct {
+	PostID         int64
+	ReactionCounts []store.ReactionCount
+	UserReacted    map[model.ReactionType]bool
+	CanReact       bool
+}
+
+// buildSinglePostRow fetches author + reaction data for a single post and builds
+// a PostDisplayRow ready for template rendering.
+func (h *PostHandlers) buildSinglePostRow(ctx context.Context, post *model.Post, user *model.User, editWindowMin int) (PostDisplayRow, error) {
+	author, err := h.store.GetUserByID(ctx, post.AuthorID)
+	if err != nil && !errors.Is(err, store.ErrNotFound) {
+		return PostDisplayRow{}, fmt.Errorf("get author: %w", err)
+	}
+
+	counts, _ := h.store.GetReactionCounts(ctx, post.ID)
+	reacted := make(map[model.ReactionType]bool)
+	if user != nil {
+		userReactions, _ := h.store.GetUserReactionsForPosts(ctx, user.ID, []int64{post.ID})
+		for _, rt := range userReactions[post.ID] {
+			reacted[rt] = true
+		}
+	}
+
+	depth := 0
+	if post.ParentID != nil {
+		depth = 1
+	}
+
+	editWindow := time.Duration(editWindowMin) * time.Minute
+	isAuthor := user != nil && user.ID == post.AuthorID
+	isMod := user != nil && user.Role.CanModerate()
+
+	row := PostDisplayRow{
+		Post:           post,
+		Author:         author,
+		ReactionCounts: counts,
+		UserReacted:    reacted,
+		Depth:          depth,
+		CanEdit:        !post.IsDeleted && ((isAuthor && time.Since(post.CreatedAt) < editWindow) || isMod),
+		CanDelete:      isMod,
+		CanReport:      user != nil && !isAuthor && !post.IsDeleted,
+		CanReact:       user != nil && !user.Banned && !post.IsDeleted,
+	}
+
+	if post.IsDeleted && post.EditedBy != nil {
+		if du, err := h.store.GetUserByID(ctx, *post.EditedBy); err == nil {
+			row.DeletedByName = du.DisplayNameOrUsername()
+		} else {
+			row.DeletedByName = "a moderator"
+		}
+	}
+
+	return row, nil
+}
+
+// getEditWindowMin loads the edit window setting, falling back to 30 minutes.
+func (h *PostHandlers) getEditWindowMin(ctx context.Context) int {
+	if settings, err := h.store.GetSettings(ctx); err == nil && settings.EditWindowMinutes > 0 {
+		return settings.EditWindowMinutes
+	}
+	return 30
+}
+
+// GetPostView handles GET /p/{post_id}: returns the post partial (used by HTMX cancel-edit).
+func (h *PostHandlers) GetPostView(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	user := middleware.UserFromContext(ctx)
+
+	postID, err := strconv.ParseInt(r.PathValue("post_id"), 10, 64)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	post, err := h.store.GetPostByID(ctx, postID)
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			http.NotFound(w, r)
+			return
+		}
+		slog.Error("get post", "id", postID, "error", err)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	row, err := h.buildSinglePostRow(ctx, post, user, h.getEditWindowMin(ctx))
+	if err != nil {
+		slog.Error("build post row", "id", postID, "error", err)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	if err := h.renderer.RenderPartial(w, "post.html", row); err != nil {
+		slog.Error("render post partial", "error", err)
+	}
+}
+
+// GetEditForm handles GET /p/{post_id}/edit.
+// HTMX: returns the inline edit form partial replacing the post.
+// Non-HTMX: redirects to the thread page (inline editing requires JS).
+func (h *PostHandlers) GetEditForm(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	user := middleware.UserFromContext(ctx)
+	if user == nil {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+
+	postID, err := strconv.ParseInt(r.PathValue("post_id"), 10, 64)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	post, err := h.store.GetPostByID(ctx, postID)
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			http.NotFound(w, r)
+			return
+		}
+		slog.Error("get post for edit form", "id", postID, "error", err)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	if post.IsDeleted {
+		http.Error(w, "Not Found", http.StatusNotFound)
+		return
+	}
+
+	editWindow := time.Duration(h.getEditWindowMin(ctx)) * time.Minute
+	isAuthor := user.ID == post.AuthorID
+	isMod := user.Role.CanModerate()
+	if !((isAuthor && time.Since(post.CreatedAt) < editWindow) || isMod) {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+
+	editData := map[string]any{
+		"Post":      post,
+		"CSRFToken": middleware.CSRFTokenFromContext(ctx),
+	}
+
+	if render.IsHTMXRequest(r) {
+		if err := h.renderer.RenderPartial(w, "post_edit_form.html", editData); err != nil {
+			slog.Error("render edit form partial", "error", err)
+		}
+		return
+	}
+
+	// Non-HTMX fallback: redirect to thread page; inline editing requires HTMX.
+	http.Redirect(w, r, fmt.Sprintf("/t/%d#post-%d", post.ThreadID, post.ID), http.StatusSeeOther)
+}
+
+// UpdatePost handles PUT /p/{post_id} (and POST with _method=PUT override).
+func (h *PostHandlers) UpdatePost(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	user := middleware.UserFromContext(ctx)
+	if user == nil {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+
+	postID, err := strconv.ParseInt(r.PathValue("post_id"), 10, 64)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	post, err := h.store.GetPostByID(ctx, postID)
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			http.NotFound(w, r)
+			return
+		}
+		slog.Error("get post for update", "id", postID, "error", err)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	if post.IsDeleted {
+		http.Error(w, "Not Found", http.StatusNotFound)
+		return
+	}
+
+	editWindow := time.Duration(h.getEditWindowMin(ctx)) * time.Minute
+	isAuthor := user.ID == post.AuthorID
+	isMod := user.Role.CanModerate()
+	if !((isAuthor && time.Since(post.CreatedAt) < editWindow) || isMod) {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+
+	body := strings.TrimSpace(r.FormValue("body"))
+	if body == "" {
+		http.Error(w, "body required", http.StatusUnprocessableEntity)
+		return
+	}
+
+	format := model.BodyFormat(r.FormValue("body_format"))
+	if !format.IsValid() {
+		format = model.BodyFormatMarkdown
+	}
+
+	now := time.Now()
+	post.Body = body
+	post.BodyFormat = format
+	post.EditCount++
+	post.EditedAt = &now
+	post.EditedBy = &user.ID
+	post.UpdatedAt = now
+
+	if err := h.store.UpdatePost(ctx, post); err != nil {
+		slog.Error("update post", "id", postID, "error", err)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	if render.IsHTMXRequest(r) {
+		row, err := h.buildSinglePostRow(ctx, post, user, h.getEditWindowMin(ctx))
+		if err != nil {
+			slog.Error("build updated post row", "error", err)
+			http.Error(w, "internal server error", http.StatusInternalServerError)
+			return
+		}
+		if err := h.renderer.RenderPartial(w, "post.html", row); err != nil {
+			slog.Error("render updated post partial", "error", err)
+		}
+		return
+	}
+
+	http.Redirect(w, r, fmt.Sprintf("/t/%d#post-%d", post.ThreadID, post.ID), http.StatusSeeOther)
+}
+
+// DeletePost handles DELETE /p/{post_id} (and POST with _method=DELETE override).
+func (h *PostHandlers) DeletePost(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	user := middleware.UserFromContext(ctx)
+	if user == nil || !user.Role.CanModerate() {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+
+	postID, err := strconv.ParseInt(r.PathValue("post_id"), 10, 64)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	post, err := h.store.GetPostByID(ctx, postID)
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			http.NotFound(w, r)
+			return
+		}
+		slog.Error("get post for delete", "id", postID, "error", err)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	if err := h.store.DeletePost(ctx, postID, user.ID); err != nil {
+		slog.Error("delete post", "id", postID, "error", err)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	// Reload the post to get IsDeleted=true and EditedBy set.
+	post, err = h.store.GetPostByID(ctx, postID)
+	if err != nil {
+		// Fallback: mark deleted inline.
+		post.IsDeleted = true
+		post.EditedBy = &user.ID
+	}
+
+	if render.IsHTMXRequest(r) {
+		row, err := h.buildSinglePostRow(ctx, post, user, h.getEditWindowMin(ctx))
+		if err != nil {
+			slog.Error("build deleted post row", "error", err)
+			http.Error(w, "internal server error", http.StatusInternalServerError)
+			return
+		}
+		if err := h.renderer.RenderPartial(w, "post.html", row); err != nil {
+			slog.Error("render deleted post partial", "error", err)
+		}
+		return
+	}
+
+	http.Redirect(w, r, fmt.Sprintf("/t/%d", post.ThreadID), http.StatusSeeOther)
+}
+
+// ReactToPost handles POST /p/{post_id}/react: toggles a reaction and returns the
+// reaction_button partial for HTMX swap.
+func (h *PostHandlers) ReactToPost(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	user := middleware.UserFromContext(ctx)
+	if user == nil || user.Banned {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+
+	postID, err := strconv.ParseInt(r.PathValue("post_id"), 10, 64)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	post, err := h.store.GetPostByID(ctx, postID)
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			http.NotFound(w, r)
+			return
+		}
+		slog.Error("get post for react", "id", postID, "error", err)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	if post.IsDeleted {
+		http.Error(w, "Not Found", http.StatusNotFound)
+		return
+	}
+
+	reactionType := model.ReactionType(r.URL.Query().Get("type"))
+	if !reactionType.IsValid() {
+		reactionType = model.ReactionTypeLike
+	}
+
+	if _, err := h.store.ToggleReaction(ctx, postID, user.ID, reactionType); err != nil {
+		slog.Error("toggle reaction", "post_id", postID, "error", err)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	counts, _ := h.store.GetReactionCounts(ctx, postID)
+	userReactions, _ := h.store.GetUserReactionsForPosts(ctx, user.ID, []int64{postID})
+	reacted := make(map[model.ReactionType]bool)
+	for _, rt := range userReactions[postID] {
+		reacted[rt] = true
+	}
+
+	data := ReactionData{
+		PostID:         postID,
+		ReactionCounts: counts,
+		UserReacted:    reacted,
+		CanReact:       true,
+	}
+
+	if err := h.renderer.RenderPartial(w, "reaction_button.html", data); err != nil {
+		slog.Error("render reaction button partial", "error", err)
+		return
+	}
+}
+
+// PostMethodOverride handles POST /p/{post_id} with _method form field for non-HTMX
+// browsers that can only send GET/POST from HTML forms.
+func (h *PostHandlers) PostMethodOverride(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	switch strings.ToUpper(r.FormValue("_method")) {
+	case "PUT":
+		h.UpdatePost(w, r)
+	case "DELETE":
+		h.DeletePost(w, r)
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
 }

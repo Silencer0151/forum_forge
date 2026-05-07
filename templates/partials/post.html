@@ -47,28 +47,43 @@
             {{end}}{{end}}
 
             <div class="ff-post__actions">
-                <div class="ff-post__reactions">
+                {{/* Reactions — structure matches reaction_button.html for HTMX outerHTML swap */}}
+                <div id="reactions-{{.Post.ID}}" class="ff-post__reactions">
+                    {{if .CanReact}}
+                    <button class="ff-btn ff-btn--ghost ff-btn--sm{{if index .UserReacted "like"}} ff-reaction--active{{end}}"
+                            hx-post="/p/{{.Post.ID}}/react?type=like"
+                            hx-target="#reactions-{{.Post.ID}}"
+                            hx-swap="outerHTML">
+                        &#128077;{{range .ReactionCounts}}{{if eq .Type "like"}}{{if gt .Count 0}} <span>{{.Count}}</span>{{end}}{{end}}{{end}}
+                    </button>
+                    {{else}}
                     {{range .ReactionCounts}}
                     <span class="ff-reaction{{if index $.UserReacted .Type}} ff-reaction--active{{end}}">
                         {{if eq .Type "like"}}&#128077;{{end}} {{.Count}}
                     </span>
                     {{end}}
-                </div>
-                <div class="ff-post__action-btns">
-                    {{if .CanReact}}
-                    <a class="ff-btn ff-btn--ghost ff-btn--sm" href="#reply-form" title="React">&#128077;</a>
                     {{end}}
+                </div>
+
+                <div class="ff-post__action-btns">
                     {{if .CanEdit}}
-                    <a class="ff-btn ff-btn--ghost ff-btn--sm" href="/p/{{.Post.ID}}/edit">Edit</a>
+                    <a class="ff-btn ff-btn--ghost ff-btn--sm"
+                       href="/p/{{.Post.ID}}/edit"
+                       hx-get="/p/{{.Post.ID}}/edit"
+                       hx-target="#post-{{.Post.ID}}"
+                       hx-swap="outerHTML">Edit</a>
                     {{end}}
                     {{if .CanReport}}
                     <a class="ff-btn ff-btn--ghost ff-btn--sm" href="/p/{{.Post.ID}}/report">Report</a>
                     {{end}}
                     {{if .CanDelete}}
-                    <form method="POST" action="/p/{{.Post.ID}}" style="display:inline">
+                    <form method="POST" action="/p/{{.Post.ID}}" style="display:inline"
+                          hx-delete="/p/{{.Post.ID}}"
+                          hx-target="#post-{{.Post.ID}}"
+                          hx-swap="outerHTML"
+                          hx-confirm="Delete this post?">
                         <input type="hidden" name="_method" value="DELETE">
-                        <button type="submit" class="ff-btn ff-btn--danger ff-btn--sm"
-                                onclick="return confirm('Delete this post?')">Delete</button>
+                        <button type="submit" class="ff-btn ff-btn--danger ff-btn--sm">Delete</button>
                     </form>
                     {{end}}
                 </div>

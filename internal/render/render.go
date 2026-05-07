@@ -104,13 +104,27 @@ func (r *Renderer) Render(w http.ResponseWriter, name string, data any) error {
 
 // RenderPartial writes an HTMX-targeted partial response without a layout
 // wrapper. name should match a file in templates/partials/ (e.g. "thread_row.html").
+// The template inside the file is expected to use {{define "<name-without-ext>"}}.
 func (r *Renderer) RenderPartial(w http.ResponseWriter, name string, data any) error {
 	tmpl, ok := r.templates["partial:"+name]
 	if !ok {
 		return fmt.Errorf("render: partial template %q not found", name)
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	return tmpl.Execute(w, data)
+	templateName := strings.TrimSuffix(name, ".html")
+	return tmpl.ExecuteTemplate(w, templateName, data)
+}
+
+// RenderContent writes just the {{define "content"}} block of a page template,
+// without the base layout wrapper. Used for HTMX responses that replace a
+// page section (e.g., paginated thread or subcategory content).
+func (r *Renderer) RenderContent(w http.ResponseWriter, name string, data any) error {
+	tmpl, ok := r.templates["page:"+name]
+	if !ok {
+		return fmt.Errorf("render: page template %q not found", name)
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	return tmpl.ExecuteTemplate(w, "content", data)
 }
 
 // FormatTime formats t as a human-readable string.

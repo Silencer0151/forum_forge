@@ -41,9 +41,12 @@ type PaginationData struct {
 	HasNext     bool
 	PrevPage    int
 	NextPage    int
+	// HTMXTarget is the CSS selector for hx-target on pagination links.
+	// When non-empty, links include hx-get, hx-target, and hx-push-url attributes.
+	HTMXTarget string
 }
 
-func buildPagination(page, totalPages int, baseURL string) PaginationData {
+func buildPagination(page, totalPages int, baseURL, htmxTarget string) PaginationData {
 	pages := make([]int, totalPages)
 	for i := range pages {
 		pages[i] = i + 1
@@ -57,6 +60,7 @@ func buildPagination(page, totalPages int, baseURL string) PaginationData {
 		HasNext:     page < totalPages,
 		PrevPage:    page - 1,
 		NextPage:    page + 1,
+		HTMXTarget:  htmxTarget,
 	}
 }
 
@@ -131,8 +135,16 @@ func (h *ThreadHandlers) SubcategoryPage(w http.ResponseWriter, r *http.Request)
 	data["Category"] = cat
 	data["Subcategory"] = sub
 	data["Threads"] = result
-	data["Pagination"] = buildPagination(result.Page, result.TotalPages, baseURL)
+	data["Pagination"] = buildPagination(result.Page, result.TotalPages, baseURL, "#subcategory-content")
 	data["CanPost"] = canPost
+
+	if render.IsHTMXRequest(r) {
+		if err := h.renderer.RenderContent(w, "subcategory.html", data); err != nil {
+			slog.Error("render subcategory content (htmx)", "error", err)
+			http.Error(w, "internal server error", http.StatusInternalServerError)
+		}
+		return
+	}
 	if err := h.renderer.Render(w, "subcategory.html", data); err != nil {
 		slog.Error("render subcategory", "error", err)
 		http.Error(w, "internal server error", http.StatusInternalServerError)

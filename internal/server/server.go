@@ -197,11 +197,13 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("GET /t/{thread_id}", s.postHandlers.ThreadPage)
 	s.mux.HandleFunc("POST /t/{thread_id}/reply", s.postHandlers.ReplyToThread)
 
-	// Posts
-	s.mux.HandleFunc("GET /p/{post_id}/edit", stub)
-	s.mux.HandleFunc("PUT /p/{post_id}", stub)
-	s.mux.HandleFunc("DELETE /p/{post_id}", stub)
-	s.mux.HandleFunc("POST /p/{post_id}/react", stub)
+	// Posts (Task 4.4 — HTMX-enhanced edit, delete, react).
+	s.mux.HandleFunc("GET /p/{post_id}", s.postHandlers.GetPostView)
+	s.mux.HandleFunc("GET /p/{post_id}/edit", s.postHandlers.GetEditForm)
+	s.mux.HandleFunc("PUT /p/{post_id}", s.postHandlers.UpdatePost)
+	s.mux.HandleFunc("DELETE /p/{post_id}", s.postHandlers.DeletePost)
+	s.mux.HandleFunc("POST /p/{post_id}", s.postHandlers.PostMethodOverride)
+	s.mux.HandleFunc("POST /p/{post_id}/react", s.postHandlers.ReactToPost)
 	s.mux.HandleFunc("POST /p/{post_id}/quote", stub)
 	s.mux.HandleFunc("POST /p/{post_id}/report", stub)
 

@@ -4,7 +4,11 @@
         <h3 class="ff-card__title">Post a Reply</h3>
     </div>
     <div class="ff-card__body">
-        <form method="POST" action="/t/{{.Thread.ID}}/reply">
+        <form method="POST" action="/t/{{.Thread.ID}}/reply"
+              hx-post="/t/{{.Thread.ID}}/reply"
+              hx-target="#post-list"
+              hx-swap="beforeend"
+              hx-on:htmx:after-request="if(event.detail.successful){this.reset()}">
             <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
 
             <div class="ff-form-group">

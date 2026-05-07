@@ -1,0 +1,40 @@
+{{define "post_edit_form"}}
+<div class="ff-post ff-post--editing" id="post-{{.Post.ID}}">
+    <div class="ff-card" style="padding:var(--ff-sp-2)">
+        <div class="ff-card__header">
+            <h4 class="ff-card__title" style="margin:0">Editing post #{{.Post.ID}}</h4>
+        </div>
+        <div class="ff-card__body">
+            <form method="POST" action="/p/{{.Post.ID}}"
+                  hx-put="/p/{{.Post.ID}}"
+                  hx-target="#post-{{.Post.ID}}"
+                  hx-swap="outerHTML">
+                <input type="hidden" name="_method" value="PUT">
+                <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+
+                <div class="ff-form-group">
+                    <label class="ff-label" for="edit-format-{{.Post.ID}}">Format</label>
+                    <select class="ff-select" id="edit-format-{{.Post.ID}}" name="body_format">
+                        <option value="markdown"{{if eq .Post.BodyFormat "markdown"}} selected{{end}}>Markdown</option>
+                        <option value="plaintext"{{if eq .Post.BodyFormat "plaintext"}} selected{{end}}>Plain Text</option>
+                        <option value="bbcode"{{if eq .Post.BodyFormat "bbcode"}} selected{{end}}>BBCode</option>
+                    </select>
+                </div>
+
+                <div class="ff-form-group">
+                    <textarea class="ff-textarea" name="body" rows="10" required>{{.Post.Body}}</textarea>
+                </div>
+
+                <div class="ff-form-actions">
+                    <button type="submit" class="ff-btn ff-btn--primary">Save Changes</button>
+                    <a class="ff-btn ff-btn--ghost"
+                       href="#post-{{.Post.ID}}"
+                       hx-get="/p/{{.Post.ID}}"
+                       hx-target="#post-{{.Post.ID}}"
+                       hx-swap="outerHTML">Cancel</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{{end}}

@@ -1,0 +1,18 @@
+{{define "reaction_button"}}
+<div id="reactions-{{.PostID}}" class="ff-post__reactions">
+    {{if .CanReact}}
+    <button class="ff-btn ff-btn--ghost ff-btn--sm{{if index .UserReacted "like"}} ff-reaction--active{{end}}"
+            hx-post="/p/{{.PostID}}/react?type=like"
+            hx-target="#reactions-{{.PostID}}"
+            hx-swap="outerHTML">
+        &#128077;{{range .ReactionCounts}}{{if eq .Type "like"}}{{if gt .Count 0}} <span>{{.Count}}</span>{{end}}{{end}}{{end}}
+    </button>
+    {{else}}
+    {{range .ReactionCounts}}
+    <span class="ff-reaction{{if index $.UserReacted .Type}} ff-reaction--active{{end}}">
+        {{if eq .Type "like"}}&#128077;{{end}} {{.Count}}
+    </span>
+    {{end}}
+    {{end}}
+</div>
+{{end}}
