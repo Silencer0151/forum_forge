@@ -1,0 +1,46 @@
+{{define "content"}}
+<nav class="ff-breadcrumbs" aria-label="Breadcrumb">
+    <ol class="ff-breadcrumbs__list">
+        <li class="ff-breadcrumbs__item"><a href="/">Forum Home</a></li>
+        <li class="ff-breadcrumbs__item"><a href="/c/{{.Category.Slug}}">{{.Category.Name}}</a></li>
+        <li class="ff-breadcrumbs__item ff-breadcrumbs__item--current" aria-current="page">{{.Subcategory.Name}}</li>
+    </ol>
+</nav>
+
+<div class="ff-page-header">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;">
+        <div>
+            <h1 class="ff-page-header__title">{{.Subcategory.Name}}</h1>
+            {{if .Subcategory.Description}}
+            <p class="ff-page-header__sub">{{.Subcategory.Description}}</p>
+            {{end}}
+        </div>
+        {{if .CanPost}}
+        <a href="/t/new?cat={{.Category.Slug}}&sub={{.Subcategory.Slug}}"
+           class="ff-btn ff-btn--primary"
+           style="flex-shrink:0;margin-top:0.25rem;">+ New Thread</a>
+        {{end}}
+    </div>
+</div>
+
+{{if .Threads.Items}}
+    {{template "pagination" .Pagination}}
+
+    <div class="ff-thread-list" id="thread-list">
+        {{range .Threads.Items}}
+        {{template "thread_row" .}}
+        {{end}}
+    </div>
+
+    {{template "pagination" .Pagination}}
+{{else}}
+<div class="ff-card">
+    <p class="ff-text-muted">
+        No threads yet.
+        {{if .CanPost}}
+        Be the first to <a href="/t/new?cat={{.Category.Slug}}&sub={{.Subcategory.Slug}}">start a discussion</a>.
+        {{end}}
+    </p>
+</div>
+{{end}}
+{{end}}

@@ -1,0 +1,24 @@
+{{define "thread_row"}}
+<div class="ff-thread-row{{if .Thread.IsPinned}} ff-thread-row--pinned{{end}}">
+    <div class="ff-thread-row__title-col">
+        <a class="ff-thread-row__title" href="/t/{{.Thread.ID}}">
+            {{if .Thread.IsPinned}}<span class="ff-thread-badge ff-thread-badge--pin">Pinned</span> {{end}}
+            {{if .Thread.IsLocked}}<span class="ff-thread-badge ff-thread-badge--lock">Locked</span> {{end}}
+            {{.Thread.Title}}
+        </a>
+        <div class="ff-thread-row__meta">
+            by {{.AuthorUsername}} &middot; {{formatTime .Thread.CreatedAt}}
+        </div>
+    </div>
+    <div class="ff-thread-row__stats">
+        <div>{{pluralize .Thread.ReplyCount "reply" "replies"}}</div>
+        <div class="ff-text-muted">{{pluralize .Thread.ViewCount "view" "views"}}</div>
+    </div>
+    <div class="ff-thread-row__last-post">
+        {{if .LastPostUsername}}
+        <div>{{.LastPostUsername}}</div>
+        {{end}}
+        <div class="ff-text-muted">{{formatTime .Thread.LastPostAt}}</div>
+    </div>
+</div>
+{{end}}

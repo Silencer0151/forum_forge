@@ -1,0 +1,67 @@
+{{define "content"}}
+<nav class="ff-breadcrumbs" aria-label="Breadcrumb">
+    <ol class="ff-breadcrumbs__list">
+        <li class="ff-breadcrumbs__item"><a href="/">Forum Home</a></li>
+        <li class="ff-breadcrumbs__item"><a href="/c/{{.Category.Slug}}">{{.Category.Name}}</a></li>
+        <li class="ff-breadcrumbs__item"><a href="/c/{{.Category.Slug}}/{{.Subcategory.Slug}}">{{.Subcategory.Name}}</a></li>
+        <li class="ff-breadcrumbs__item ff-breadcrumbs__item--current" aria-current="page">New Thread</li>
+    </ol>
+</nav>
+
+<div class="ff-page-header">
+    <h1 class="ff-page-header__title">New Thread</h1>
+    <p class="ff-page-header__sub">Posting in <strong>{{.Subcategory.Name}}</strong></p>
+</div>
+
+{{if .Error}}
+<div class="ff-alert ff-alert--error" role="alert">{{.Error}}</div>
+{{end}}
+
+<div class="ff-card">
+    <div class="ff-card__body">
+        <form method="POST" action="/t/new">
+            <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+            <input type="hidden" name="cat_slug" value="{{.Category.Slug}}">
+            <input type="hidden" name="sub_slug" value="{{.Subcategory.Slug}}">
+
+            <div class="ff-form-group">
+                <label class="ff-label" for="title">Title</label>
+                <input class="ff-input"
+                       type="text"
+                       id="title"
+                       name="title"
+                       value="{{.FormTitle}}"
+                       maxlength="200"
+                       placeholder="Thread title"
+                       required
+                       autofocus>
+                <span class="ff-input-hint">Maximum 200 characters.</span>
+            </div>
+
+            <div class="ff-form-group">
+                <label class="ff-label" for="body_format">Format</label>
+                <select class="ff-select" id="body_format" name="body_format">
+                    <option value="markdown"{{if eq .FormFormat "markdown"}} selected{{end}}>Markdown</option>
+                    <option value="plaintext"{{if eq .FormFormat "plaintext"}} selected{{end}}>Plain Text</option>
+                    <option value="bbcode"{{if eq .FormFormat "bbcode"}} selected{{end}}>BBCode</option>
+                </select>
+            </div>
+
+            <div class="ff-form-group">
+                <label class="ff-label" for="body">Post</label>
+                <textarea class="ff-textarea"
+                          id="body"
+                          name="body"
+                          rows="12"
+                          placeholder="Write your post here..."
+                          required>{{.FormBody}}</textarea>
+            </div>
+
+            <div class="ff-form-actions">
+                <button type="submit" class="ff-btn ff-btn--primary">Post Thread</button>
+                <a href="/c/{{.Category.Slug}}/{{.Subcategory.Slug}}" class="ff-btn ff-btn--ghost">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+{{end}}
