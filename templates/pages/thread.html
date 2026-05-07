@@ -1,0 +1,60 @@
+{{define "content"}}
+<nav class="ff-breadcrumbs" aria-label="Breadcrumb">
+    <ol class="ff-breadcrumbs__list">
+        <li class="ff-breadcrumbs__item"><a href="/">Forum Home</a></li>
+        <li class="ff-breadcrumbs__item"><a href="/c/{{.Category.Slug}}">{{.Category.Name}}</a></li>
+        <li class="ff-breadcrumbs__item"><a href="/c/{{.Category.Slug}}/{{.Subcategory.Slug}}">{{.Subcategory.Name}}</a></li>
+        <li class="ff-breadcrumbs__item ff-breadcrumbs__item--current" aria-current="page">{{truncate .Thread.Title 60}}</li>
+    </ol>
+</nav>
+
+<div class="ff-page-header">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;">
+        <div>
+            <h1 class="ff-page-header__title">
+                {{if .Thread.IsPinned}}<span class="ff-thread-badge ff-thread-badge--pin">Pinned</span> {{end}}
+                {{if .Thread.IsLocked}}<span class="ff-thread-badge ff-thread-badge--lock">Locked</span> {{end}}
+                {{.Thread.Title}}
+            </h1>
+            <p class="ff-page-header__sub">
+                {{pluralize .Thread.ReplyCount "reply" "replies"}} &middot; {{pluralize .Thread.ViewCount "view" "views"}}
+            </p>
+        </div>
+        {{if .CanReply}}
+        <a href="#reply-form" class="ff-btn ff-btn--primary" style="flex-shrink:0;margin-top:0.25rem;">Reply</a>
+        {{end}}
+    </div>
+</div>
+
+{{if .Thread.IsLocked}}
+<div class="ff-alert ff-alert--warning">This thread is locked. No new replies can be posted.</div>
+{{end}}
+
+{{template "pagination" .Pagination}}
+
+<div class="ff-post-list" id="post-list">
+    {{range .PostRows}}
+    {{template "post" .}}
+    {{end}}
+</div>
+
+{{template "pagination" .Pagination}}
+
+{{if .CanReply}}
+<div id="reply-form" class="ff-mt-2">
+    {{template "post_form" $}}
+</div>
+{{else if .User}}
+<div class="ff-card ff-mt-2">
+    <p class="ff-text-muted" style="text-align:center;padding:var(--ff-sp-2)">
+        {{if .Thread.IsLocked}}This thread is locked and is not accepting new replies.{{else}}You cannot reply to this thread.{{end}}
+    </p>
+</div>
+{{else}}
+<div class="ff-card ff-mt-2">
+    <p class="ff-text-muted" style="text-align:center;padding:var(--ff-sp-2)">
+        <a href="/auth/login">Log in</a> to post a reply.
+    </p>
+</div>
+{{end}}
+{{end}}

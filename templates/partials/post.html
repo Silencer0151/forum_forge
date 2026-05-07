@@ -1,0 +1,81 @@
+{{define "post"}}
+<div class="ff-post{{if eq .Depth 1}} ff-post--nested{{end}}" id="post-{{.Post.ID}}">
+    {{if .Post.IsDeleted}}
+    <div class="ff-post__deleted">
+        [This post has been removed by {{if .DeletedByName}}{{.DeletedByName}}{{else}}a moderator{{end}}]
+    </div>
+    {{else}}
+    <div class="ff-post__layout">
+
+        <div class="ff-author-card">
+            {{if .Author}}
+            <img class="ff-avatar ff-avatar--lg"
+                 src="{{if .Author.AvatarURL}}{{.Author.AvatarURL}}{{else}}{{gravatar .Author.Email}}{{end}}"
+                 alt="{{.Author.Username}}'s avatar"
+                 loading="lazy">
+            <div class="ff-author-card__name">
+                <a href="/u/{{.Author.Username}}">{{.Author.DisplayNameOrUsername}}</a>
+            </div>
+            <span class="ff-role-badge ff-role-badge--{{.Author.Role}}">{{.Author.Role}}</span>
+            <div class="ff-author-card__meta ff-text-muted">
+                {{pluralize .Author.PostCount "post" "posts"}}<br>
+                Joined {{formatTime .Author.CreatedAt}}
+            </div>
+            {{else}}
+            <div class="ff-author-card__name ff-text-muted">[deleted]</div>
+            {{end}}
+        </div>
+
+        <div class="ff-post__content">
+            <div class="ff-post__header">
+                <a class="ff-post__permalink ff-text-muted" href="#post-{{.Post.ID}}" title="Permalink">#{{.Post.ID}}</a>
+                <span class="ff-text-muted">{{formatTime .Post.CreatedAt}}</span>
+                {{if .Post.EditCount}}
+                <span class="ff-text-muted">&middot; edited</span>
+                {{end}}
+            </div>
+
+            <div class="ff-post-body">
+                {{if eq .Post.BodyFormat "markdown"}}{{markdown .Post.Body}}{{else}}{{.Post.Body}}{{end}}
+            </div>
+
+            {{if .Author}}{{if .Author.Signature}}
+            <div class="ff-post__signature">
+                <div class="ff-post__signature-sep"></div>
+                <div class="ff-text-muted" style="font-size:0.85rem;white-space:pre-wrap">{{.Author.Signature}}</div>
+            </div>
+            {{end}}{{end}}
+
+            <div class="ff-post__actions">
+                <div class="ff-post__reactions">
+                    {{range .ReactionCounts}}
+                    <span class="ff-reaction{{if index $.UserReacted .Type}} ff-reaction--active{{end}}">
+                        {{if eq .Type "like"}}&#128077;{{end}} {{.Count}}
+                    </span>
+                    {{end}}
+                </div>
+                <div class="ff-post__action-btns">
+                    {{if .CanReact}}
+                    <a class="ff-btn ff-btn--ghost ff-btn--sm" href="#reply-form" title="React">&#128077;</a>
+                    {{end}}
+                    {{if .CanEdit}}
+                    <a class="ff-btn ff-btn--ghost ff-btn--sm" href="/p/{{.Post.ID}}/edit">Edit</a>
+                    {{end}}
+                    {{if .CanReport}}
+                    <a class="ff-btn ff-btn--ghost ff-btn--sm" href="/p/{{.Post.ID}}/report">Report</a>
+                    {{end}}
+                    {{if .CanDelete}}
+                    <form method="POST" action="/p/{{.Post.ID}}" style="display:inline">
+                        <input type="hidden" name="_method" value="DELETE">
+                        <button type="submit" class="ff-btn ff-btn--danger ff-btn--sm"
+                                onclick="return confirm('Delete this post?')">Delete</button>
+                    </form>
+                    {{end}}
+                </div>
+            </div>
+        </div>
+
+    </div>
+    {{end}}
+</div>
+{{end}}

@@ -1,0 +1,36 @@
+{{define "post_form"}}
+<div class="ff-card" id="post-form-card">
+    <div class="ff-card__header">
+        <h3 class="ff-card__title">Post a Reply</h3>
+    </div>
+    <div class="ff-card__body">
+        <form method="POST" action="/t/{{.Thread.ID}}/reply">
+            <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+
+            <div class="ff-form-group">
+                <label class="ff-label" for="body_format">Format</label>
+                <select class="ff-select" id="body_format" name="body_format">
+                    <option value="markdown"{{if eq .FormFormat "markdown"}} selected{{end}}>Markdown</option>
+                    <option value="plaintext"{{if eq .FormFormat "plaintext"}} selected{{end}}>Plain Text</option>
+                    <option value="bbcode"{{if eq .FormFormat "bbcode"}} selected{{end}}>BBCode</option>
+                </select>
+            </div>
+
+            <div class="ff-form-group">
+                <label class="ff-label" for="reply-body">Reply</label>
+                <textarea class="ff-textarea"
+                          id="reply-body"
+                          name="body"
+                          rows="8"
+                          placeholder="Write your reply here..."
+                          required></textarea>
+            </div>
+
+            <div class="ff-form-actions">
+                <button type="submit" class="ff-btn ff-btn--primary">Post Reply</button>
+                <a href="/c/{{.Category.Slug}}/{{.Subcategory.Slug}}" class="ff-btn ff-btn--ghost">Back to thread list</a>
+            </div>
+        </form>
+    </div>
+</div>
+{{end}}

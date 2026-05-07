@@ -51,6 +51,7 @@ type Server struct {
 	authHandlers     *handler.AuthHandlers
 	categoryHandlers *handler.CategoryHandlers
 	threadHandlers   *handler.ThreadHandlers
+	postHandlers     *handler.PostHandlers
 }
 
 // AuthDeps bundles the auth-flow building blocks the server needs but does
@@ -93,6 +94,7 @@ func New(cfg *config.Config, st store.Store, r *render.Renderer, staticFS fs.FS,
 	)
 	s.categoryHandlers = handler.NewCategory(st, r)
 	s.threadHandlers = handler.NewThreadHandler(st, r)
+	s.postHandlers = handler.NewPostHandler(st, r)
 
 	s.registerRoutes()
 	s.handler = s.wrapMiddleware(s.mux)
@@ -191,9 +193,9 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("GET /t/new", s.threadHandlers.NewThreadPage)
 	s.mux.HandleFunc("POST /t/new", s.threadHandlers.CreateThread)
 
-	// Thread view and replies (stubs until Task 4.3).
-	s.mux.HandleFunc("GET /t/{thread_id}", stub)
-	s.mux.HandleFunc("POST /t/{thread_id}/reply", stub)
+	// Thread view and replies (Task 4.3).
+	s.mux.HandleFunc("GET /t/{thread_id}", s.postHandlers.ThreadPage)
+	s.mux.HandleFunc("POST /t/{thread_id}/reply", s.postHandlers.ReplyToThread)
 
 	// Posts
 	s.mux.HandleFunc("GET /p/{post_id}/edit", stub)

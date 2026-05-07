@@ -729,6 +729,175 @@ hr {
     font-weight: 600;
 }
 
+/* ---- Post list & post layout ------------------------------ */
+.ff-post-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ff-sp-1);
+    margin-bottom: var(--ff-sp-2);
+}
+
+.ff-post {
+    background: var(--ff-bg-secondary);
+    border: 1px solid var(--ff-border);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.ff-post--nested {
+    margin-left: var(--ff-sp-4);
+    border-left: 3px solid var(--ff-accent-subtle);
+}
+
+.ff-post__layout {
+    display: flex;
+    gap: 0;
+}
+
+.ff-post__deleted {
+    padding: var(--ff-sp-2);
+    color: var(--ff-text-secondary);
+    font-style: italic;
+    font-size: 0.9rem;
+}
+
+/* ---- Author card (left column) ---------------------------- */
+.ff-author-card {
+    width: 140px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.4em;
+    padding: var(--ff-sp-2);
+    background: var(--ff-bg-tertiary);
+    border-right: 1px solid var(--ff-border);
+    text-align: center;
+    font-size: 0.8rem;
+}
+
+.ff-author-card .ff-avatar--lg {
+    width: 64px;
+    height: 64px;
+}
+
+.ff-author-card__name {
+    font-weight: 600;
+    font-size: 0.875rem;
+    word-break: break-word;
+}
+.ff-author-card__name a { color: var(--ff-text-primary); }
+.ff-author-card__name a:hover { color: var(--ff-accent); }
+
+.ff-author-card__meta {
+    line-height: 1.4;
+}
+
+/* ---- Post content (right column) -------------------------- */
+.ff-post__content {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    padding: var(--ff-sp-2);
+    gap: var(--ff-sp-1);
+}
+
+.ff-post__header {
+    display: flex;
+    align-items: center;
+    gap: var(--ff-sp-1);
+    font-size: 0.8rem;
+    padding-bottom: var(--ff-sp-1);
+    border-bottom: 1px solid var(--ff-border);
+}
+
+.ff-post__permalink {
+    margin-left: auto;
+    font-family: var(--ff-font-mono);
+}
+.ff-post__permalink:hover { color: var(--ff-accent); }
+
+/* ---- Post signature --------------------------------------- */
+.ff-post__signature {
+    margin-top: var(--ff-sp-1);
+}
+
+.ff-post__signature-sep {
+    height: 1px;
+    background: var(--ff-border);
+    margin-bottom: var(--ff-sp-1);
+}
+
+/* ---- Post action bar -------------------------------------- */
+.ff-post__actions {
+    display: flex;
+    align-items: center;
+    gap: var(--ff-sp-1);
+    padding-top: var(--ff-sp-1);
+    border-top: 1px solid var(--ff-border);
+    flex-wrap: wrap;
+}
+
+.ff-post__reactions {
+    display: flex;
+    gap: 0.4em;
+    flex-wrap: wrap;
+}
+
+.ff-reaction {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25em;
+    font-size: 0.8rem;
+    color: var(--ff-text-secondary);
+    padding: 0.15em 0.5em;
+    border-radius: 4px;
+    background: var(--ff-bg-tertiary);
+    border: 1px solid var(--ff-border);
+}
+
+.ff-reaction--active {
+    color: var(--ff-accent);
+    border-color: var(--ff-accent);
+    background: var(--ff-accent-subtle);
+}
+
+.ff-post__action-btns {
+    display: flex;
+    gap: 0.4em;
+    flex-wrap: wrap;
+    margin-left: auto;
+}
+
+/* ---- Responsive: collapse author card on mobile ----------- */
+@media (max-width: 600px) {
+    .ff-post__layout {
+        flex-direction: column;
+    }
+
+    .ff-author-card {
+        width: 100%;
+        flex-direction: row;
+        border-right: none;
+        border-bottom: 1px solid var(--ff-border);
+        justify-content: flex-start;
+        text-align: left;
+        padding: var(--ff-sp-1) var(--ff-sp-2);
+    }
+
+    .ff-author-card .ff-avatar--lg {
+        width: 36px;
+        height: 36px;
+    }
+
+    .ff-author-card__meta { display: none; }
+
+    .ff-post--nested {
+        margin-left: var(--ff-sp-2);
+    }
+}
+
 /* ---- Utility --------------------------------------------- */
 .ff-sr-only {
     position: absolute;
