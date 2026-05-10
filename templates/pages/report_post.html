@@ -1,0 +1,41 @@
+{{define "content"}}
+<div>
+
+<nav class="ff-breadcrumbs" aria-label="Breadcrumb">
+    <ol class="ff-breadcrumbs__list">
+        <li class="ff-breadcrumbs__item"><a href="/">Forum Home</a></li>
+        <li class="ff-breadcrumbs__item ff-breadcrumbs__item--current" aria-current="page">Report Post</li>
+    </ol>
+</nav>
+
+<div class="ff-page-header">
+    <h1 class="ff-page-header__title">Report Post #{{.PostID}}</h1>
+    <p class="ff-page-header__sub">Let the moderation team know about a rule violation or problematic content.</p>
+</div>
+
+<div class="ff-card">
+    {{if .Submitted}}
+    <p style="margin:0 0 var(--ff-sp-2) 0;">Report submitted &#8212; a moderator will review it shortly.</p>
+    <a class="ff-btn ff-btn--primary" href="/">Return to Forum</a>
+    {{else}}
+    {{if .Error}}
+    <p style="color:var(--ff-danger,#e55);margin:0 0 var(--ff-sp-2) 0;">{{.Error}}</p>
+    {{end}}
+    <form method="POST" action="/p/{{.PostID}}/report">
+        <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+        <div class="ff-form-group">
+            <label class="ff-label" for="report-reason">Reason</label>
+            <textarea class="ff-textarea" id="report-reason" name="reason"
+                      rows="5" placeholder="Describe why you&#39;re reporting this post..."
+                      required>{{.Reason}}</textarea>
+        </div>
+        <div class="ff-form-actions">
+            <button type="submit" class="ff-btn ff-btn--primary">Submit Report</button>
+            <a class="ff-btn ff-btn--ghost" href="javascript:history.back()">Cancel</a>
+        </div>
+    </form>
+    {{end}}
+</div>
+
+</div>
+{{end}}

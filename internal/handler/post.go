@@ -16,17 +16,26 @@ import (
 	"github.com/nitro/forum_forge/internal/store"
 )
 
-const defaultPostsPerPage = 20
+const (
+	defaultPostsPerPage = 20
+	reportRateLimit     = 5
+	reportRateWindow    = time.Hour
+)
 
 // PostHandlers handles thread-view and reply endpoints.
 type PostHandlers struct {
-	store    store.Store
-	renderer *render.Renderer
+	store         store.Store
+	renderer      *render.Renderer
+	reportLimiter *middleware.Limiter
 }
 
 // NewPostHandler constructs a PostHandlers.
 func NewPostHandler(st store.Store, r *render.Renderer) *PostHandlers {
-	return &PostHandlers{store: st, renderer: r}
+	return &PostHandlers{
+		store:         st,
+		renderer:      r,
+		reportLimiter: middleware.NewLimiter(reportRateLimit, reportRateWindow),
+	}
 }
 
 // PostDisplayRow bundles everything the post partial needs to render one post.
@@ -778,4 +787,183 @@ func (h *PostHandlers) PostMethodOverride(w http.ResponseWriter, r *http.Request
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}
+}
+
+// reportFormData is the template data for the report_form partial and report_post page.
+type reportFormData struct {
+	PostID    int64
+	CSRFToken string
+	Submitted bool
+	Error     string
+	Reason    string
+}
+
+// GetReportForm handles GET /p/{post_id}/report.
+// HTMX: returns the report form partial inline.
+// Non-HTMX: serves a full report page.
+func (h *PostHandlers) GetReportForm(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	user := middleware.UserFromContext(ctx)
+	if user == nil {
+		http.Redirect(w, r, "/auth/login", http.StatusSeeOther)
+		return
+	}
+
+	postID, err := strconv.ParseInt(r.PathValue("post_id"), 10, 64)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	post, err := h.store.GetPostByID(ctx, postID)
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			http.NotFound(w, r)
+			return
+		}
+		slog.Error("get post for report form", "id", postID, "error", err)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	if post.IsDeleted || post.AuthorID == user.ID {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+
+	csrfToken := middleware.CSRFTokenFromContext(ctx)
+
+	if render.IsHTMXRequest(r) {
+		fd := reportFormData{PostID: postID, CSRFToken: csrfToken}
+		if err := h.renderer.RenderPartial(w, "report_form.html", fd); err != nil {
+			slog.Error("render report form partial", "id", postID, "error", err)
+		}
+		return
+	}
+
+	data := BaseData(r)
+	data["Title"] = "Report Post"
+	data["PostID"] = postID
+	data["Submitted"] = false
+	if err := h.renderer.Render(w, "report_post.html", data); err != nil {
+		slog.Error("render report post page", "id", postID, "error", err)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+	}
+}
+
+// ReportPost handles POST /p/{post_id}/report: validates and creates a Report record.
+// HTMX: returns a confirmation or error partial.
+// Non-HTMX: redirects to the thread after success, or re-renders the form on error.
+func (h *PostHandlers) ReportPost(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	user := middleware.UserFromContext(ctx)
+	if user == nil {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+
+	postID, err := strconv.ParseInt(r.PathValue("post_id"), 10, 64)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	post, err := h.store.GetPostByID(ctx, postID)
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			http.NotFound(w, r)
+			return
+		}
+		slog.Error("get post for report", "id", postID, "error", err)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	if post.IsDeleted {
+		http.Error(w, "Not Found", http.StatusNotFound)
+		return
+	}
+
+	if post.AuthorID == user.ID {
+		http.Error(w, "You cannot report your own posts", http.StatusForbidden)
+		return
+	}
+
+	csrfToken := middleware.CSRFTokenFromContext(ctx)
+
+	// Rate limit: 5 reports/hour per user.
+	ok, retry := h.reportLimiter.Allow(fmt.Sprintf("report:u:%d", user.ID), time.Now())
+	if !ok {
+		secs := int(retry.Seconds())
+		if secs < 1 {
+			secs = 1
+		}
+		w.Header().Set("Retry-After", strconv.Itoa(secs))
+		if render.IsHTMXRequest(r) {
+			w.WriteHeader(http.StatusTooManyRequests)
+			fd := reportFormData{
+				PostID:    postID,
+				CSRFToken: csrfToken,
+				Error:     "You are reporting too quickly. Please wait before submitting another report.",
+			}
+			h.renderer.RenderPartial(w, "report_form.html", fd) //nolint:errcheck
+			return
+		}
+		http.Error(w, "You are reporting too quickly. Please wait before submitting another report.", http.StatusTooManyRequests)
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+
+	reason := strings.TrimSpace(r.FormValue("reason"))
+	if reason == "" {
+		if render.IsHTMXRequest(r) {
+			fd := reportFormData{
+				PostID:    postID,
+				CSRFToken: csrfToken,
+				Error:     "Please provide a reason for the report.",
+			}
+			if err := h.renderer.RenderPartial(w, "report_form.html", fd); err != nil {
+				slog.Error("render report form error partial", "error", err)
+			}
+			return
+		}
+		data := BaseData(r)
+		data["Title"] = "Report Post"
+		data["PostID"] = postID
+		data["Error"] = "Please provide a reason for the report."
+		data["Reason"] = reason
+		h.renderer.Render(w, "report_post.html", data) //nolint:errcheck
+		return
+	}
+
+	now := time.Now()
+	report := &model.Report{
+		ReporterID: user.ID,
+		PostID:     postID,
+		Reason:     reason,
+		Status:     model.ReportStatusOpen,
+		CreatedAt:  now,
+	}
+
+	if err := h.store.CreateReport(ctx, report); err != nil {
+		slog.Error("create report", "post_id", postID, "reporter_id", user.ID, "error", err)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	slog.Info("post reported", "post_id", postID, "reporter_id", user.ID, "report_id", report.ID)
+
+	if render.IsHTMXRequest(r) {
+		fd := reportFormData{PostID: postID, Submitted: true}
+		if err := h.renderer.RenderPartial(w, "report_form.html", fd); err != nil {
+			slog.Error("render report confirm partial", "error", err)
+		}
+		return
+	}
+
+	http.Redirect(w, r, fmt.Sprintf("/t/%d#post-%d", post.ThreadID, post.ID), http.StatusSeeOther)
 }

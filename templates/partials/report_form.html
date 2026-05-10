@@ -1,0 +1,48 @@
+{{define "report_form"}}
+<div id="report-area-{{.PostID}}" class="ff-report-area">
+    {{if .Submitted}}
+    <p class="ff-text-muted" style="font-size:0.9rem;margin:0;padding:var(--ff-sp-1) 0;">
+        Report submitted &#8212; a moderator will review it.
+    </p>
+    {{else if .Error}}
+    <p style="font-size:0.9rem;margin:0;padding:var(--ff-sp-1) 0;color:var(--ff-danger,#e55);">{{.Error}}</p>
+    <form method="POST" action="/p/{{.PostID}}/report"
+          hx-post="/p/{{.PostID}}/report"
+          hx-target="#report-area-{{.PostID}}"
+          hx-swap="outerHTML"
+          style="margin-top:var(--ff-sp-1)">
+        <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+        <div class="ff-form-group" style="margin-bottom:var(--ff-sp-1)">
+            <label class="ff-label" for="report-reason-{{.PostID}}">Reason</label>
+            <textarea class="ff-textarea" id="report-reason-{{.PostID}}" name="reason"
+                      rows="3" placeholder="Describe why you&#39;re reporting this post..." required
+                      style="font-size:0.9rem;min-height:4rem"></textarea>
+        </div>
+        <div class="ff-form-actions" style="gap:var(--ff-sp-1)">
+            <button type="submit" class="ff-btn ff-btn--primary ff-btn--sm">Submit Report</button>
+            <button type="button" class="ff-btn ff-btn--ghost ff-btn--sm"
+                    onclick="document.getElementById('report-area-{{.PostID}}').outerHTML=''">Cancel</button>
+        </div>
+    </form>
+    {{else}}
+    <form method="POST" action="/p/{{.PostID}}/report"
+          hx-post="/p/{{.PostID}}/report"
+          hx-target="#report-area-{{.PostID}}"
+          hx-swap="outerHTML"
+          style="margin-top:var(--ff-sp-1)">
+        <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+        <div class="ff-form-group" style="margin-bottom:var(--ff-sp-1)">
+            <label class="ff-label" for="report-reason-{{.PostID}}">Reason</label>
+            <textarea class="ff-textarea" id="report-reason-{{.PostID}}" name="reason"
+                      rows="3" placeholder="Describe why you&#39;re reporting this post..." required
+                      style="font-size:0.9rem;min-height:4rem"></textarea>
+        </div>
+        <div class="ff-form-actions" style="gap:var(--ff-sp-1)">
+            <button type="submit" class="ff-btn ff-btn--primary ff-btn--sm">Submit Report</button>
+            <button type="button" class="ff-btn ff-btn--ghost ff-btn--sm"
+                    onclick="document.getElementById('report-area-{{.PostID}}').outerHTML=''">Cancel</button>
+        </div>
+    </form>
+    {{end}}
+</div>
+{{end}}

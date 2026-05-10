@@ -81,7 +81,13 @@
                        hx-swap="outerHTML">Edit</a>
                     {{end}}
                     {{if .CanReport}}
-                    <a class="ff-btn ff-btn--ghost ff-btn--sm" href="/p/{{.Post.ID}}/report">Report</a>
+                    <span id="report-area-{{.Post.ID}}">
+                        <a class="ff-btn ff-btn--ghost ff-btn--sm"
+                           href="/p/{{.Post.ID}}/report"
+                           hx-get="/p/{{.Post.ID}}/report"
+                           hx-target="#report-area-{{.Post.ID}}"
+                           hx-swap="outerHTML">Report</a>
+                    </span>
                     {{end}}
                     {{if .CanDelete}}
                     <form method="POST" action="/p/{{.Post.ID}}" style="display:inline"

@@ -241,7 +241,8 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("POST /p/{post_id}", s.postHandlers.PostMethodOverride)
 	s.mux.HandleFunc("POST /p/{post_id}/react", s.postHandlers.ReactToPost)
 	s.mux.HandleFunc("POST /p/{post_id}/quote", s.postHandlers.QuotePost)
-	s.mux.HandleFunc("POST /p/{post_id}/report", stub)
+	s.mux.HandleFunc("GET /p/{post_id}/report", s.postHandlers.GetReportForm)
+	s.mux.HandleFunc("POST /p/{post_id}/report", s.postHandlers.ReportPost)
 
 	// Users (Task 5.1).
 	s.mux.HandleFunc("GET /u/{username}", s.userHandlers.ProfilePage)
