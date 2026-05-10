@@ -1,0 +1,15 @@
+{{define "flash"}}
+{{if .Flashes}}
+<div class="ff-flash-container" role="region" aria-label="Notifications">
+    {{range .Flashes}}
+    <div class="ff-alert ff-alert--{{.Category}} ff-flash" role="alert" aria-live="polite"
+         x-data="{show: true}" x-show="show" x-init="setTimeout(() => show = false, 5000)"
+         x-transition:leave="ff-flash-fade-out">
+        <span class="ff-flash__message">{{.Message}}</span>
+        <button class="ff-flash__dismiss" type="button" aria-label="Dismiss"
+                @click="show = false">&#x2715;</button>
+    </div>
+    {{end}}
+</div>
+{{end}}
+{{end}}

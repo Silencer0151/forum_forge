@@ -117,6 +117,35 @@ func (r *Renderer) RenderPartial(w http.ResponseWriter, name string, data any) e
 	return tmpl.ExecuteTemplate(w, templateName, data)
 }
 
+// RenderError renders the error.html page with the given HTTP status code. It
+// sets the status on the response writer before executing the template so the
+// browser receives the correct code. data may be nil; StatusCode, Message, and
+// Title keys are injected automatically when absent.
+func (r *Renderer) RenderError(w http.ResponseWriter, status int, data map[string]any) {
+	if data == nil {
+		data = map[string]any{}
+	}
+	if _, ok := data["StatusCode"]; !ok {
+		data["StatusCode"] = status
+	}
+	if _, ok := data["Message"]; !ok {
+		data["Message"] = http.StatusText(status)
+	}
+	if _, ok := data["Title"]; !ok {
+		data["Title"] = fmt.Sprintf("%d %s", status, http.StatusText(status))
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(status)
+	tmpl, ok := r.templates["page:error.html"]
+	if !ok {
+		fmt.Fprintf(w, "%d %s\n", status, http.StatusText(status))
+		return
+	}
+	if err := tmpl.ExecuteTemplate(w, "base", data); err != nil {
+		fmt.Fprintf(w, "\n<!-- render error: %v -->", err)
+	}
+}
+
 // RenderContent writes just the {{define "content"}} block of a page template,
 // without the base layout wrapper. Used for HTMX responses that replace a
 // page section (e.g., paginated thread or subcategory content).

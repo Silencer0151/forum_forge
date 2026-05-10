@@ -13,13 +13,15 @@ import (
 )
 
 // BaseData returns the layout-level template variables every page needs:
-// the authenticated user (or nil for guests), the per-request CSRF token, and
-// the current year for the footer copyright. Page handlers compose this with
-// page-specific keys before calling Render.
+// the authenticated user (or nil for guests), the per-request CSRF token,
+// flash messages consumed from the flash cookie, and the current year for the
+// footer copyright. Page handlers compose this with page-specific keys before
+// calling Render.
 func BaseData(r *http.Request) map[string]any {
 	return map[string]any{
 		"User":      middleware.UserFromContext(r.Context()),
 		"CSRFToken": middleware.CSRFTokenFromContext(r.Context()),
+		"Flashes":   middleware.FlashesFromContext(r.Context()),
 		"Year":      time.Now().Year(),
 	}
 }

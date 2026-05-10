@@ -59,6 +59,7 @@ type Server struct {
 	moderationHandlers  *handler.ModerationHandlers
 	adminHandlers       *handler.AdminHandlers
 	searchHandlers      *handler.SearchHandlers
+	attachmentHandlers  *handler.AttachmentHandlers
 }
 
 // AuthDeps bundles the auth-flow building blocks the server needs but does
@@ -112,6 +113,8 @@ func New(cfg *config.Config, st store.Store, r *render.Renderer, staticFS fs.FS,
 	s.moderationHandlers = handler.NewModerationHandler(st, r)
 	s.adminHandlers = handler.NewAdminHandler(st, r)
 	s.searchHandlers = handler.NewSearchHandler(st, r)
+	s.attachmentHandlers = handler.NewAttachmentHandler(st, cfg.UploadPath)
+	s.postHandlers.SetAttachmentHandlers(s.attachmentHandlers)
 
 	s.registerRoutes()
 	s.handler = s.wrapMiddleware(s.mux)
@@ -124,18 +127,24 @@ func New(cfg *config.Config, st store.Store, r *render.Renderer, staticFS fs.FS,
 func (s *Server) Handler() http.Handler { return s.handler }
 
 // wrapMiddleware composes the per-request middleware in spec.md §5.2 order.
-// Outer→inner: Proxy (normalize r.RemoteAddr/scheme, set HSTS) → Auth (resolve
-// user from session) → Logging (so user_id is available) → RateLimit (per
-// user/IP, after auth so the key reflects the real identity) → CSRF (reject
-// missing/mismatched tokens on unsafe methods) → mux.
+// Outer→inner: Recovery (catch panics, render 500) → Proxy (normalize
+// r.RemoteAddr/scheme, set HSTS) → Auth (resolve user from session) → Flash
+// (pop flash cookie into context) → Logging (so user_id is available) →
+// RateLimit (per user/IP, after auth so the key reflects the real identity) →
+// CSRF (reject missing/mismatched tokens on unsafe methods) → mux.
 func (s *Server) wrapMiddleware(h http.Handler) http.Handler {
 	limiter := middleware.NewLimiter(globalRateLimit, globalRateWindow)
+	renderer := s.renderer
 	return middleware.Chain(
+		middleware.Recovery(func(w http.ResponseWriter, r *http.Request) {
+			renderer.RenderError(w, http.StatusInternalServerError, nil)
+		}),
 		middleware.Proxy(middleware.ProxyConfig{
 			TrustProxy: s.cfg.TrustProxy,
 			HSTSValue:  s.hstsValue(),
 		}),
 		middleware.Auth(s.authenticator),
+		middleware.FlashMiddleware,
 		middleware.Logging(slog.Default()),
 		middleware.RateLimit(limiter),
 		middleware.CSRF(middleware.CSRFConfig{Secure: s.secureCookies()}),
@@ -170,6 +179,7 @@ func (s *Server) hstsValue() string {
 // is canceled. On cancellation it triggers a graceful shutdown.
 func (s *Server) Run(ctx context.Context) error {
 	go s.runDraftCleanup(ctx)
+	go s.runAttachmentCleanup(ctx)
 
 	switch s.cfg.TLSMode {
 	case "autocert":
@@ -200,6 +210,24 @@ func (s *Server) runDraftCleanup(ctx context.Context) {
 	}
 }
 
+// runAttachmentCleanup deletes orphaned attachment records (no associated post)
+// older than 24 hours once per day.
+func (s *Server) runAttachmentCleanup(ctx context.Context) {
+	ticker := time.NewTicker(24 * time.Hour)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			cutoff := time.Now().Add(-24 * time.Hour)
+			if err := s.store.DeleteOrphanedAttachments(context.Background(), cutoff); err != nil {
+				slog.Warn("attachment cleanup", "error", err)
+			}
+		}
+	}
+}
+
 // ── route registration ────────────────────────────────────────────────────────
 
 func (s *Server) registerRoutes() {
@@ -212,6 +240,9 @@ func (s *Server) registerRoutes() {
 	// User-uploaded files (avatars, etc.) served from the upload directory on disk.
 	uploadsHandler := http.StripPrefix("/uploads/", http.FileServer(http.Dir(s.cfg.UploadPath)))
 	s.mux.Handle("GET /uploads/", uploadsHandler)
+
+	// Attachments: served with correct Content-Type and Content-Disposition via DB lookup.
+	s.mux.HandleFunc("GET /attachments/{id}", s.attachmentHandlers.ServeAttachment)
 
 	// Health check (referenced from spec.md §9.2 for Docker readiness).
 	s.mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {

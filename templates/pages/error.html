@@ -1,0 +1,19 @@
+{{define "content"}}
+<div class="ff-error-page">
+    <div class="ff-error-page__code">{{.StatusCode}}</div>
+    <h1 class="ff-error-page__title">{{.Message}}</h1>
+    {{if eq .StatusCode 404}}
+    <p class="ff-error-page__detail">The page you're looking for doesn't exist or may have been moved.</p>
+    {{else if eq .StatusCode 403}}
+    <p class="ff-error-page__detail">You don't have permission to view this page.</p>
+    {{else if eq .StatusCode 429}}
+    <p class="ff-error-page__detail">You're doing that too often. Please wait a moment and try again.</p>
+    {{else}}
+    <p class="ff-error-page__detail">Something went wrong on our end. Please try again or return to the forum.</p>
+    {{end}}
+    <div class="ff-error-page__actions">
+        <a class="ff-btn ff-btn--primary" href="/">Forum Home</a>
+        <button class="ff-btn ff-btn--ghost" onclick="history.back()">Go Back</button>
+    </div>
+</div>
+{{end}}
