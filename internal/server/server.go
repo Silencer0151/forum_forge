@@ -57,6 +57,7 @@ type Server struct {
 	pmHandlers          *handler.PMHandlers
 	draftHandlers       *handler.DraftHandlers
 	moderationHandlers  *handler.ModerationHandlers
+	adminHandlers       *handler.AdminHandlers
 }
 
 // AuthDeps bundles the auth-flow building blocks the server needs but does
@@ -108,6 +109,7 @@ func New(cfg *config.Config, st store.Store, r *render.Renderer, staticFS fs.FS,
 	s.pmHandlers = handler.NewPMHandler(st, r)
 	s.draftHandlers = handler.NewDraftHandler(st, r)
 	s.moderationHandlers = handler.NewModerationHandler(st, r)
+	s.adminHandlers = handler.NewAdminHandler(st, r)
 
 	s.registerRoutes()
 	s.handler = s.wrapMiddleware(s.mux)
@@ -283,11 +285,11 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("POST /mod/threads/{id}/pin", s.moderationHandlers.PinThread)
 	s.mux.HandleFunc("POST /mod/users/{id}/ban", s.moderationHandlers.BanUserByID)
 
-	// Admin
-	s.mux.HandleFunc("GET /admin/settings", stub)
-	s.mux.HandleFunc("POST /admin/settings", stub)
-	s.mux.HandleFunc("GET /admin/categories", stub)
-	s.mux.HandleFunc("POST /admin/categories", stub)
+	// Admin (Task 6.3).
+	s.mux.HandleFunc("GET /admin/settings", s.adminHandlers.AdminSettingsPage)
+	s.mux.HandleFunc("POST /admin/settings", s.adminHandlers.UpdateAdminSettings)
+	s.mux.HandleFunc("GET /admin/categories", s.adminHandlers.AdminCategoriesPage)
+	s.mux.HandleFunc("POST /admin/categories", s.adminHandlers.UpdateAdminCategories)
 
 	// Drafts (Task 5.4 — auto-save endpoints).
 	s.mux.HandleFunc("GET /drafts", s.draftHandlers.GetDraft)

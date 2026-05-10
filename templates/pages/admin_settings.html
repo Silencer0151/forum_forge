@@ -1,0 +1,114 @@
+{{define "content"}}
+<div>
+
+<nav class="ff-breadcrumbs" aria-label="Breadcrumb">
+    <ol class="ff-breadcrumbs__list">
+        <li class="ff-breadcrumbs__item"><a href="/">Forum Home</a></li>
+        <li class="ff-breadcrumbs__item"><a href="/admin/settings">Admin</a></li>
+        <li class="ff-breadcrumbs__item ff-breadcrumbs__item--current" aria-current="page">Settings</li>
+    </ol>
+</nav>
+
+<div class="ff-page-header">
+    <h1 class="ff-page-header__title">Admin Settings</h1>
+    <a href="/admin/categories" class="ff-btn ff-btn--ghost">Manage Categories</a>
+</div>
+
+{{if .Notice}}
+<div class="ff-alert ff-alert--success" role="alert" style="margin-bottom:var(--ff-sp-3);">
+    {{.Notice}}
+</div>
+{{end}}
+{{if .Error}}
+<div class="ff-alert ff-alert--error" role="alert" style="margin-bottom:var(--ff-sp-3);">
+    {{.Error}}
+</div>
+{{end}}
+
+<form method="POST" action="/admin/settings">
+    <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+
+    <!-- Post & Thread Display -->
+    <div class="ff-card ff-mt-2">
+        <h2 style="margin:0 0 var(--ff-sp-3) 0;font-size:1.1rem;color:var(--ff-accent);">Post &amp; Thread Display</h2>
+
+        <div class="ff-form-group">
+            <label class="ff-label" for="posts_per_page">Posts per page</label>
+            <input class="ff-input" type="number" id="posts_per_page" name="posts_per_page"
+                   value="{{.Settings.PostsPerPage}}" min="1" max="200" required>
+            <span class="ff-hint">Number of posts shown per thread page (default: 20).</span>
+        </div>
+
+        <div class="ff-form-group">
+            <label class="ff-label" for="threads_per_page">Threads per page</label>
+            <input class="ff-input" type="number" id="threads_per_page" name="threads_per_page"
+                   value="{{.Settings.ThreadsPerPage}}" min="1" max="200" required>
+            <span class="ff-hint">Number of threads shown per subcategory page (default: 25).</span>
+        </div>
+
+        <div class="ff-form-group">
+            <label class="ff-label" for="edit_window_minutes">Edit window (minutes)</label>
+            <input class="ff-input" type="number" id="edit_window_minutes" name="edit_window_minutes"
+                   value="{{.Settings.EditWindowMinutes}}" min="0" max="10080">
+            <span class="ff-hint">How long members can edit their posts after posting. Set to 0 for unlimited.</span>
+        </div>
+    </div>
+
+    <!-- Rate Limits -->
+    <div class="ff-card ff-mt-3">
+        <h2 style="margin:0 0 var(--ff-sp-3) 0;font-size:1.1rem;color:var(--ff-accent);">Rate Limits</h2>
+
+        <div class="ff-form-group">
+            <label class="ff-label" for="rate_limit_posts_per_minute">Max posts per minute (per user)</label>
+            <input class="ff-input" type="number" id="rate_limit_posts_per_minute" name="rate_limit_posts_per_minute"
+                   value="{{.Settings.RateLimitPostsPerMinute}}" min="0" max="60">
+            <span class="ff-hint">Maximum number of posts a user can create per minute. Set to 0 to disable.</span>
+        </div>
+
+        <div class="ff-form-group">
+            <label class="ff-label" for="rate_limit_threads_per_hour">Max threads per hour (per user)</label>
+            <input class="ff-input" type="number" id="rate_limit_threads_per_hour" name="rate_limit_threads_per_hour"
+                   value="{{.Settings.RateLimitThreadsPerHour}}" min="0" max="100">
+            <span class="ff-hint">Maximum number of threads a user can create per hour. Set to 0 to disable.</span>
+        </div>
+    </div>
+
+    <!-- Spam Protection -->
+    <div class="ff-card ff-mt-3">
+        <h2 style="margin:0 0 var(--ff-sp-3) 0;font-size:1.1rem;color:var(--ff-accent);">Spam Protection</h2>
+
+        <div class="ff-form-group">
+            <label class="ff-label" for="require_captcha_until_post_count">Require CAPTCHA until post count</label>
+            <input class="ff-input" type="number" id="require_captcha_until_post_count" name="require_captcha_until_post_count"
+                   value="{{.Settings.RequireCaptchaUntilPostCount}}" min="0" max="1000">
+            <span class="ff-hint">New users must solve a CAPTCHA until they have this many posts. Set to 0 to disable.</span>
+        </div>
+    </div>
+
+    <!-- Attachments -->
+    <div class="ff-card ff-mt-3">
+        <h2 style="margin:0 0 var(--ff-sp-3) 0;font-size:1.1rem;color:var(--ff-accent);">File Attachments</h2>
+
+        <div class="ff-form-group">
+            <label class="ff-label" for="max_attachment_size_mb">Max attachment size (MB)</label>
+            <input class="ff-input" type="number" id="max_attachment_size_mb" name="max_attachment_size_mb"
+                   value="{{.MaxAttachmentSizeMB}}" min="0.1" max="100" step="0.1">
+            <span class="ff-hint">Maximum file size for uploads (default: 5 MB).</span>
+        </div>
+
+        <div class="ff-form-group">
+            <label class="ff-label" for="allowed_attachment_types">Allowed MIME types</label>
+            <textarea class="ff-input" id="allowed_attachment_types" name="allowed_attachment_types"
+                      rows="6" style="font-family:monospace;font-size:0.85rem;">{{.AllowedTypesText}}</textarea>
+            <span class="ff-hint">One MIME type per line (e.g. <code>image/jpeg</code>). Only these types will be accepted.</span>
+        </div>
+    </div>
+
+    <div style="margin-top:var(--ff-sp-4);display:flex;gap:var(--ff-sp-2);">
+        <button type="submit" class="ff-btn ff-btn--primary">Save Settings</button>
+        <a href="/admin/settings" class="ff-btn ff-btn--ghost">Reset</a>
+    </div>
+</form>
+
+</div>
+{{end}}

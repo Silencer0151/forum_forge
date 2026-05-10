@@ -1,0 +1,287 @@
+{{define "content"}}
+<div>
+
+<nav class="ff-breadcrumbs" aria-label="Breadcrumb">
+    <ol class="ff-breadcrumbs__list">
+        <li class="ff-breadcrumbs__item"><a href="/">Forum Home</a></li>
+        <li class="ff-breadcrumbs__item"><a href="/admin/settings">Admin</a></li>
+        <li class="ff-breadcrumbs__item ff-breadcrumbs__item--current" aria-current="page">Categories</li>
+    </ol>
+</nav>
+
+<div class="ff-page-header">
+    <h1 class="ff-page-header__title">Category Management</h1>
+    <a href="/admin/settings" class="ff-btn ff-btn--ghost">Admin Settings</a>
+</div>
+
+{{if .Notice}}
+<div class="ff-alert ff-alert--success" role="alert" style="margin-bottom:var(--ff-sp-3);">
+    {{.Notice}}
+</div>
+{{end}}
+{{if .Error}}
+<div class="ff-alert ff-alert--error" role="alert" style="margin-bottom:var(--ff-sp-3);">
+    {{.Error}}
+</div>
+{{end}}
+
+<!-- ── Category List ────────────────────────────────────────────────────────── -->
+
+{{if .CategoriesWithSubs}}
+{{range .CategoriesWithSubs}}
+<div class="ff-card ff-mt-2" x-data="{editCat: false}">
+
+    <!-- Category header row -->
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:var(--ff-sp-2);flex-wrap:wrap;margin-bottom:var(--ff-sp-2);">
+        <div>
+            <strong style="font-size:1.05rem;">{{.Category.Name}}</strong>
+            {{if .Category.IsPublic}}
+            <span style="display:inline-block;padding:0.1rem 0.45rem;background:rgba(80,180,80,0.18);color:#6fcf6f;border-radius:3px;font-size:0.75rem;margin-left:0.4rem;">Public</span>
+            {{else}}
+            <span style="display:inline-block;padding:0.1rem 0.45rem;background:rgba(220,80,80,0.18);color:#cf6f6f;border-radius:3px;font-size:0.75rem;margin-left:0.4rem;">Private</span>
+            {{end}}
+            <span style="margin-left:0.5rem;font-size:0.75rem;color:var(--ff-text-muted);">/{{.Category.Slug}}</span>
+            {{if .Category.Description}}
+            <p style="margin:0.3rem 0 0 0;font-size:0.875rem;color:var(--ff-text-muted);">{{.Category.Description}}</p>
+            {{end}}
+        </div>
+
+        <!-- Reorder + Edit + Delete -->
+        <div style="display:flex;gap:var(--ff-sp-1);align-items:center;flex-wrap:wrap;">
+
+            <form method="POST" action="/admin/categories" style="display:inline;">
+                <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+                <input type="hidden" name="action" value="move_category_up">
+                <input type="hidden" name="id" value="{{.Category.ID}}">
+                <button type="submit" class="ff-btn ff-btn--ghost ff-btn--sm" title="Move up" aria-label="Move category up">&#8593;</button>
+            </form>
+
+            <form method="POST" action="/admin/categories" style="display:inline;">
+                <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+                <input type="hidden" name="action" value="move_category_down">
+                <input type="hidden" name="id" value="{{.Category.ID}}">
+                <button type="submit" class="ff-btn ff-btn--ghost ff-btn--sm" title="Move down" aria-label="Move category down">&#8595;</button>
+            </form>
+
+            <button type="button" class="ff-btn ff-btn--secondary ff-btn--sm"
+                    @click="editCat = !editCat"
+                    x-text="editCat ? 'Cancel' : 'Edit'"></button>
+
+            <form method="POST" action="/admin/categories" style="display:inline;"
+                  onsubmit="return confirm('Delete this category? This cannot be undone.')">
+                <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+                <input type="hidden" name="action" value="delete_category">
+                <input type="hidden" name="id" value="{{.Category.ID}}">
+                <button type="submit" class="ff-btn ff-btn--danger ff-btn--sm"
+                        {{if .HasThreads}}disabled title="Cannot delete: category contains threads"{{end}}>
+                    Delete
+                </button>
+            </form>
+
+        </div>
+    </div>
+
+    <!-- Inline edit form -->
+    <div x-show="editCat" x-cloak style="border-top:1px solid var(--ff-border);padding-top:var(--ff-sp-2);margin-bottom:var(--ff-sp-3);">
+        <form method="POST" action="/admin/categories">
+            <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+            <input type="hidden" name="action" value="edit_category">
+            <input type="hidden" name="id" value="{{.Category.ID}}">
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--ff-sp-2);">
+                <div class="ff-form-group">
+                    <label class="ff-label">Name</label>
+                    <input class="ff-input" type="text" name="name" value="{{.Category.Name}}" required maxlength="100">
+                </div>
+                <div class="ff-form-group">
+                    <label class="ff-label">Slug</label>
+                    <input class="ff-input" type="text" name="slug" value="{{.Category.Slug}}" maxlength="100"
+                           placeholder="auto-generated if blank">
+                </div>
+            </div>
+            <div class="ff-form-group">
+                <label class="ff-label">Description</label>
+                <input class="ff-input" type="text" name="description" value="{{.Category.Description}}" maxlength="500">
+            </div>
+            <div class="ff-form-group" style="display:flex;align-items:center;gap:var(--ff-sp-2);">
+                <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;">
+                    <input type="checkbox" name="is_public" value="1"
+                           {{if .Category.IsPublic}}checked{{end}}>
+                    Publicly visible (guests can see this category)
+                </label>
+            </div>
+
+            <div style="display:flex;gap:var(--ff-sp-1);">
+                <button type="submit" class="ff-btn ff-btn--primary ff-btn--sm">Save Category</button>
+                <button type="button" class="ff-btn ff-btn--ghost ff-btn--sm" @click="editCat = false">Cancel</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Subcategory list -->
+    <div style="border-top:1px solid var(--ff-border);padding-top:var(--ff-sp-2);">
+        <p style="font-size:0.8rem;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:var(--ff-text-muted);margin:0 0 var(--ff-sp-2) 0;">
+            Subcategories
+            {{if .Subcategories}}({{len .Subcategories}}){{else}}(none){{end}}
+        </p>
+
+        {{range .Subcategories}}
+        <div class="ff-card" style="background:rgba(0,0,0,0.15);margin-bottom:var(--ff-sp-1);" x-data="{editSub: false}">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:var(--ff-sp-1);flex-wrap:wrap;">
+                <div>
+                    <strong>{{.Name}}</strong>
+                    <span style="font-size:0.75rem;color:var(--ff-text-muted);margin-left:0.4rem;">/{{.Slug}}</span>
+                    {{if .Description}}
+                    <p style="margin:0.2rem 0 0 0;font-size:0.8rem;color:var(--ff-text-muted);">{{.Description}}</p>
+                    {{end}}
+                </div>
+
+                <div style="display:flex;gap:var(--ff-sp-1);align-items:center;">
+                    <form method="POST" action="/admin/categories" style="display:inline;">
+                        <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+                        <input type="hidden" name="action" value="move_subcategory_up">
+                        <input type="hidden" name="id" value="{{.ID}}">
+                        <input type="hidden" name="category_id" value="{{.CategoryID}}">
+                        <button type="submit" class="ff-btn ff-btn--ghost ff-btn--sm" title="Move up" aria-label="Move subcategory up">&#8593;</button>
+                    </form>
+
+                    <form method="POST" action="/admin/categories" style="display:inline;">
+                        <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+                        <input type="hidden" name="action" value="move_subcategory_down">
+                        <input type="hidden" name="id" value="{{.ID}}">
+                        <input type="hidden" name="category_id" value="{{.CategoryID}}">
+                        <button type="submit" class="ff-btn ff-btn--ghost ff-btn--sm" title="Move down" aria-label="Move subcategory down">&#8595;</button>
+                    </form>
+
+                    <button type="button" class="ff-btn ff-btn--secondary ff-btn--sm"
+                            @click="editSub = !editSub"
+                            x-text="editSub ? 'Cancel' : 'Edit'"></button>
+
+                    <form method="POST" action="/admin/categories" style="display:inline;"
+                          onsubmit="return confirm('Delete this subcategory?')">
+                        <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+                        <input type="hidden" name="action" value="delete_subcategory">
+                        <input type="hidden" name="id" value="{{.ID}}">
+                        <button type="submit" class="ff-btn ff-btn--danger ff-btn--sm">Delete</button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Inline subcategory edit form -->
+            <div x-show="editSub" x-cloak style="border-top:1px solid var(--ff-border);padding-top:var(--ff-sp-2);margin-top:var(--ff-sp-2);">
+                <form method="POST" action="/admin/categories">
+                    <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+                    <input type="hidden" name="action" value="edit_subcategory">
+                    <input type="hidden" name="id" value="{{.ID}}">
+
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--ff-sp-2);">
+                        <div class="ff-form-group">
+                            <label class="ff-label">Name</label>
+                            <input class="ff-input" type="text" name="name" value="{{.Name}}" required maxlength="100">
+                        </div>
+                        <div class="ff-form-group">
+                            <label class="ff-label">Slug</label>
+                            <input class="ff-input" type="text" name="slug" value="{{.Slug}}" maxlength="100"
+                                   placeholder="auto-generated if blank">
+                        </div>
+                    </div>
+                    <div class="ff-form-group">
+                        <label class="ff-label">Description</label>
+                        <input class="ff-input" type="text" name="description" value="{{.Description}}" maxlength="500">
+                    </div>
+
+                    <div style="display:flex;gap:var(--ff-sp-1);">
+                        <button type="submit" class="ff-btn ff-btn--primary ff-btn--sm">Save Subcategory</button>
+                        <button type="button" class="ff-btn ff-btn--ghost ff-btn--sm" @click="editSub = false">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        {{end}}
+
+        <!-- Add subcategory form -->
+        <div x-data="{addSub: false}" style="margin-top:var(--ff-sp-2);">
+            <button type="button" class="ff-btn ff-btn--ghost ff-btn--sm" @click="addSub = !addSub"
+                    x-text="addSub ? 'Cancel' : '+ Add Subcategory'"></button>
+
+            <div x-show="addSub" x-cloak style="margin-top:var(--ff-sp-2);padding:var(--ff-sp-2);background:rgba(0,0,0,0.1);border-radius:4px;">
+                <form method="POST" action="/admin/categories">
+                    <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+                    <input type="hidden" name="action" value="create_subcategory">
+                    <input type="hidden" name="category_id" value="{{.Category.ID}}">
+
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--ff-sp-2);">
+                        <div class="ff-form-group">
+                            <label class="ff-label">Name <span style="color:var(--ff-accent);">*</span></label>
+                            <input class="ff-input" type="text" name="name" required maxlength="100" placeholder="General Discussion">
+                        </div>
+                        <div class="ff-form-group">
+                            <label class="ff-label">Slug</label>
+                            <input class="ff-input" type="text" name="slug" maxlength="100" placeholder="auto-generated if blank">
+                        </div>
+                    </div>
+                    <div class="ff-form-group">
+                        <label class="ff-label">Description</label>
+                        <input class="ff-input" type="text" name="description" maxlength="500" placeholder="A brief description (optional)">
+                    </div>
+
+                    <button type="submit" class="ff-btn ff-btn--primary ff-btn--sm">Create Subcategory</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+</div>
+{{end}}
+{{else}}
+<div class="ff-card ff-mt-2" style="text-align:center;padding:var(--ff-sp-4);">
+    <p class="ff-text-muted" style="margin:0;">No categories yet. Create the first one below.</p>
+</div>
+{{end}}
+
+<!-- ── Create New Category ──────────────────────────────────────────────────── -->
+
+<div class="ff-card ff-mt-4" x-data="{addCat: false}">
+    <div style="display:flex;justify-content:space-between;align-items:center;">
+        <h2 style="margin:0;font-size:1rem;color:var(--ff-accent);">Add New Category</h2>
+        <button type="button" class="ff-btn ff-btn--secondary ff-btn--sm"
+                @click="addCat = !addCat"
+                x-text="addCat ? 'Cancel' : 'New Category'"></button>
+    </div>
+
+    <div x-show="addCat" x-cloak style="margin-top:var(--ff-sp-3);">
+        <form method="POST" action="/admin/categories">
+            <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+            <input type="hidden" name="action" value="create_category">
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--ff-sp-2);">
+                <div class="ff-form-group">
+                    <label class="ff-label" for="new_cat_name">Name <span style="color:var(--ff-accent);">*</span></label>
+                    <input class="ff-input" type="text" id="new_cat_name" name="name" required maxlength="100" placeholder="Community">
+                </div>
+                <div class="ff-form-group">
+                    <label class="ff-label" for="new_cat_slug">Slug</label>
+                    <input class="ff-input" type="text" id="new_cat_slug" name="slug" maxlength="100" placeholder="auto-generated if blank">
+                </div>
+            </div>
+
+            <div class="ff-form-group">
+                <label class="ff-label" for="new_cat_description">Description</label>
+                <input class="ff-input" type="text" id="new_cat_description" name="description" maxlength="500"
+                       placeholder="A brief description (optional)">
+            </div>
+
+            <div class="ff-form-group" style="display:flex;align-items:center;gap:0.5rem;">
+                <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;">
+                    <input type="checkbox" name="is_public" value="1" checked>
+                    Publicly visible (guests can see this category)
+                </label>
+            </div>
+
+            <button type="submit" class="ff-btn ff-btn--primary">Create Category</button>
+        </form>
+    </div>
+</div>
+
+</div>
+{{end}}
