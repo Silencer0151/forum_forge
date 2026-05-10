@@ -1,6 +1,6 @@
 {{define "post_form"}}
 <div class="ff-card" id="post-form-card"
-     x-data="{}"
+     x-data="{attachmentPreviews: []}"
      x-init="(function(){
          var ta = document.getElementById('reply-body');
          if (ta && !ta.value.trim()) {
@@ -13,10 +13,12 @@
     </div>
     <div class="ff-card__body">
         <form method="POST" action="/t/{{.Thread.ID}}/reply"
+              enctype="multipart/form-data"
               hx-post="/t/{{.Thread.ID}}/reply"
               hx-target="#post-list"
               hx-swap="beforeend"
-              hx-on:htmx:after-request="if(event.detail.successful){localStorage.removeItem('ff_draft_thread_{{.Thread.ID}}');this.reset()}">
+              hx-encoding="multipart/form-data"
+              hx-on:htmx:after-request="if(event.detail.successful){localStorage.removeItem('ff_draft_thread_{{.Thread.ID}}');this.reset();$data.attachmentPreviews=[]}">
             <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
             <input type="hidden" name="thread_id" value="{{.Thread.ID}}">
 
@@ -43,6 +45,42 @@
                           hx-swap="none"
                           @input="localStorage.setItem('ff_draft_thread_{{.Thread.ID}}', $el.value)"
                           >{{if .DraftBody}}{{.DraftBody}}{{else if .QuoteText}}{{.QuoteText}}{{end}}</textarea>
+            </div>
+
+            <div class="ff-form-group">
+                <label class="ff-label" for="attachments">Attachments <span class="ff-text-muted">(optional, max 5)</span></label>
+                <input type="file"
+                       class="ff-input"
+                       id="attachments"
+                       name="attachments"
+                       multiple
+                       accept="image/jpeg,image/png,image/gif,image/webp,application/pdf,application/zip"
+                       @change="
+                           attachmentPreviews = [];
+                           Array.from($event.target.files).slice(0, 5).forEach(function(file) {
+                               if (file.type.startsWith('image/')) {
+                                   var reader = new FileReader();
+                                   reader.onload = function(e) {
+                                       attachmentPreviews.push({name: file.name, src: e.target.result, isImage: true});
+                                   };
+                                   reader.readAsDataURL(file);
+                               } else {
+                                   attachmentPreviews.push({name: file.name, src: null, isImage: false});
+                               }
+                           });
+                       ">
+                <p class="ff-text-muted" style="font-size:0.8rem;margin-top:0.25rem">Allowed: JPEG, PNG, GIF, WebP, PDF, ZIP &mdash; max 5 MB each</p>
+
+                <div x-show="attachmentPreviews.length > 0" class="ff-attachment-previews">
+                    <template x-for="(p, i) in attachmentPreviews" :key="i">
+                        <div class="ff-attachment-preview">
+                            <img x-show="p.isImage" :src="p.src" :alt="p.name"
+                                 class="ff-attachment-preview__thumb" loading="lazy">
+                            <span x-show="!p.isImage" class="ff-attachment-preview__icon">&#128196;</span>
+                            <span class="ff-attachment-preview__name" x-text="p.name"></span>
+                        </div>
+                    </template>
+                </div>
             </div>
 
             <div class="ff-form-actions">

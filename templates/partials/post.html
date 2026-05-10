@@ -39,6 +39,34 @@
                 {{if eq .Post.BodyFormat "markdown"}}{{markdown .Post.Body}}{{else}}{{.Post.Body}}{{end}}
             </div>
 
+            {{if .Attachments}}
+            <div class="ff-post__attachments">
+                <div class="ff-post__attachments-title">Attachments</div>
+                <div class="ff-attachments-list">
+                    {{range .Attachments}}
+                    {{if isImage .ContentType}}
+                    <div class="ff-attachment ff-attachment--image">
+                        <a href="/attachments/{{.ID}}" target="_blank" rel="noopener">
+                            <img src="/attachments/{{.ID}}"
+                                 alt="{{.Filename}}"
+                                 class="ff-attachment__img"
+                                 loading="lazy">
+                        </a>
+                        <div class="ff-attachment__meta ff-text-muted">{{.Filename}} &mdash; {{formatBytes .SizeBytes}}</div>
+                    </div>
+                    {{else}}
+                    <div class="ff-attachment ff-attachment--file">
+                        <a href="/attachments/{{.ID}}" class="ff-btn ff-btn--ghost ff-btn--sm" download="{{.Filename}}">
+                            &#128196; {{.Filename}}
+                        </a>
+                        <span class="ff-text-muted" style="font-size:0.8rem">{{formatBytes .SizeBytes}}</span>
+                    </div>
+                    {{end}}
+                    {{end}}
+                </div>
+            </div>
+            {{end}}
+
             {{if .Author}}{{if .Author.Signature}}
             <div class="ff-post__signature">
                 <div class="ff-post__signature-sep"></div>

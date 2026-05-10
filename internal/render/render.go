@@ -36,11 +36,13 @@ func New(fsys fs.FS) (*Renderer, error) {
 
 func (r *Renderer) buildFuncMap() template.FuncMap {
 	return template.FuncMap{
-		"formatTime": FormatTime,
-		"truncate":   Truncate,
-		"pluralize":  Pluralize,
-		"markdown":   func(s string) template.HTML { return template.HTML(RenderMarkdown(s)) },
-		"gravatar":   GravatarURL,
+		"formatTime":  FormatTime,
+		"truncate":    Truncate,
+		"pluralize":   Pluralize,
+		"markdown":    func(s string) template.HTML { return template.HTML(RenderMarkdown(s)) },
+		"gravatar":    GravatarURL,
+		"formatBytes": FormatBytes,
+		"isImage":     IsImageContentType,
 	}
 }
 
@@ -155,4 +157,23 @@ func Pluralize(n int, singular, plural string) string {
 func GravatarURL(email string) string {
 	h := md5.Sum([]byte(strings.ToLower(strings.TrimSpace(email))))
 	return fmt.Sprintf("https://www.gravatar.com/avatar/%x?d=identicon&s=80", h)
+}
+
+// FormatBytes formats a byte count as a human-readable string (e.g. "1.2 MB").
+func FormatBytes(n int64) string {
+	switch {
+	case n >= 1<<30:
+		return fmt.Sprintf("%.1f GB", float64(n)/(1<<30))
+	case n >= 1<<20:
+		return fmt.Sprintf("%.1f MB", float64(n)/(1<<20))
+	case n >= 1<<10:
+		return fmt.Sprintf("%.1f KB", float64(n)/(1<<10))
+	default:
+		return fmt.Sprintf("%d B", n)
+	}
+}
+
+// IsImageContentType reports whether the MIME type represents an image.
+func IsImageContentType(contentType string) bool {
+	return strings.HasPrefix(contentType, "image/")
 }

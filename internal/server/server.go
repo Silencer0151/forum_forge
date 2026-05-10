@@ -58,6 +58,7 @@ type Server struct {
 	draftHandlers       *handler.DraftHandlers
 	moderationHandlers  *handler.ModerationHandlers
 	adminHandlers       *handler.AdminHandlers
+	searchHandlers      *handler.SearchHandlers
 }
 
 // AuthDeps bundles the auth-flow building blocks the server needs but does
@@ -110,6 +111,7 @@ func New(cfg *config.Config, st store.Store, r *render.Renderer, staticFS fs.FS,
 	s.draftHandlers = handler.NewDraftHandler(st, r)
 	s.moderationHandlers = handler.NewModerationHandler(st, r)
 	s.adminHandlers = handler.NewAdminHandler(st, r)
+	s.searchHandlers = handler.NewSearchHandler(st, r)
 
 	s.registerRoutes()
 	s.handler = s.wrapMiddleware(s.mux)
@@ -221,11 +223,6 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("GET /{$}", s.categoryHandlers.Home)
 	s.mux.HandleFunc("GET /c/{category_slug}", s.categoryHandlers.Category)
 
-	// Routes from spec.md §5.3. Real implementations land in later phases;
-	// for now they return 501 Not Implemented so a missing handler shows
-	// up clearly in tests rather than as a silent 404.
-	stub := s.notImplemented
-
 	// Thread listing and creation (Task 4.2).
 	s.mux.HandleFunc("GET /c/{category_slug}/{sub_slug}", s.threadHandlers.SubcategoryPage)
 	s.mux.HandleFunc("GET /t/new", s.threadHandlers.NewThreadPage)
@@ -261,8 +258,8 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("GET /pm/{pm_id}", s.pmHandlers.ViewMessage)
 	s.mux.HandleFunc("POST /pm/{pm_id}/delete", s.pmHandlers.DeleteMessage)
 
-	// Search
-	s.mux.HandleFunc("GET /search", stub)
+	// Search (Task 7.2).
+	s.mux.HandleFunc("GET /search", s.searchHandlers.SearchPage)
 
 	// Auth (standalone email+password — see internal/handler/auth.go).
 	// Task 3.3 will route these through an AuthAdapter so integrated mode

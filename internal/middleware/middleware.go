@@ -20,6 +20,7 @@ const (
 	sessionCtxKey
 	csrfTokenCtxKey
 	clientIPCtxKey
+	flashCtxKey
 )
 
 // Chain composes middleware so that the leftmost argument is outermost on the

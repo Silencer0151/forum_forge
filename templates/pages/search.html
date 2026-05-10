@@ -1,0 +1,42 @@
+{{define "content"}}
+<div>
+
+<nav class="ff-breadcrumbs" aria-label="Breadcrumb">
+    <ol class="ff-breadcrumbs__list">
+        <li class="ff-breadcrumbs__item"><a href="/">Forum Home</a></li>
+        <li class="ff-breadcrumbs__item ff-breadcrumbs__item--current" aria-current="page">Search</li>
+    </ol>
+</nav>
+
+<div class="ff-page-header">
+    <h1 class="ff-page-header__title">Search</h1>
+</div>
+
+<div class="ff-card ff-mb-3">
+    <form method="GET" action="/search">
+        <div style="display:flex;gap:var(--ff-sp-2);align-items:center;">
+            <input
+                class="ff-input"
+                type="search"
+                name="q"
+                value="{{.Query}}"
+                placeholder="Search posts and threads..."
+                autofocus
+                autocomplete="off"
+                style="flex:1;"
+                hx-get="/search"
+                hx-trigger="keyup changed delay:300ms, search"
+                hx-target="#results"
+                hx-replace-url="true"
+            >
+            <button class="ff-btn ff-btn--primary" type="submit">Search</button>
+        </div>
+    </form>
+</div>
+
+<div id="results">
+    {{template "search_results" .}}
+</div>
+
+</div>
+{{end}}

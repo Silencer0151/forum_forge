@@ -24,9 +24,10 @@ const (
 
 // PostHandlers handles thread-view and reply endpoints.
 type PostHandlers struct {
-	store         store.Store
-	renderer      *render.Renderer
-	reportLimiter *middleware.Limiter
+	store               store.Store
+	renderer            *render.Renderer
+	reportLimiter       *middleware.Limiter
+	attachmentHandlers  *AttachmentHandlers
 }
 
 // NewPostHandler constructs a PostHandlers.
@@ -38,11 +39,17 @@ func NewPostHandler(st store.Store, r *render.Renderer) *PostHandlers {
 	}
 }
 
+// SetAttachmentHandlers wires the attachment sub-handler used during reply creation.
+func (h *PostHandlers) SetAttachmentHandlers(ah *AttachmentHandlers) {
+	h.attachmentHandlers = ah
+}
+
 // PostDisplayRow bundles everything the post partial needs to render one post.
 type PostDisplayRow struct {
 	Post           *model.Post
 	Author         *model.User
 	DeletedByName  string
+	Attachments    []*model.Attachment
 	ReactionCounts []store.ReactionCount
 	UserReacted    map[model.ReactionType]bool
 	Depth          int
@@ -156,6 +163,8 @@ func (h *PostHandlers) ThreadPage(w http.ResponseWriter, r *http.Request) {
 			depth = 1
 		}
 
+		attachments, _ := h.store.ListAttachmentsByPostID(ctx, p.Post.ID)
+
 		isAuthor := user != nil && user.ID == p.Post.AuthorID
 		withinWindow := time.Since(p.Post.CreatedAt) < editWindow
 		isMod := user != nil && user.Role.CanModerate()
@@ -163,6 +172,7 @@ func (h *PostHandlers) ThreadPage(w http.ResponseWriter, r *http.Request) {
 		row := PostDisplayRow{
 			Post:           p.Post,
 			Author:         p.Author,
+			Attachments:    attachments,
 			ReactionCounts: counts,
 			UserReacted:    reacted,
 			Depth:          depth,
@@ -270,7 +280,9 @@ func (h *PostHandlers) ReplyToThread(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := r.ParseForm(); err != nil {
+	// ParseMultipartForm handles both multipart (file uploads) and regular forms.
+	// 32 MB in-memory limit; larger files spill to temp files automatically.
+	if err := r.ParseMultipartForm(32 << 20); err != nil && err != http.ErrNotMultipart {
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
 	}
@@ -308,6 +320,18 @@ func (h *PostHandlers) ReplyToThread(w http.ResponseWriter, r *http.Request) {
 		slog.Error("create reply post", "thread_id", threadID, "error", err)
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
+	}
+
+	// Process any uploaded attachments now that we have the post ID.
+	if h.attachmentHandlers != nil {
+		settings, _ := h.store.GetSettings(ctx)
+		if settings == nil {
+			def := model.DefaultSettings()
+			settings = &def
+		}
+		if _, err := h.attachmentHandlers.SavePostAttachments(r, post, settings); err != nil {
+			slog.Warn("save post attachments", "post_id", post.ID, "error", err)
+		}
 	}
 
 	if err := h.store.UpdateLastPost(ctx, threadID, user.ID, now); err != nil {
@@ -379,9 +403,12 @@ func (h *PostHandlers) buildSinglePostRow(ctx context.Context, post *model.Post,
 	isAuthor := user != nil && user.ID == post.AuthorID
 	isMod := user != nil && user.Role.CanModerate()
 
+	attachments, _ := h.store.ListAttachmentsByPostID(ctx, post.ID)
+
 	row := PostDisplayRow{
 		Post:           post,
 		Author:         author,
+		Attachments:    attachments,
 		ReactionCounts: counts,
 		UserReacted:    reacted,
 		Depth:          depth,

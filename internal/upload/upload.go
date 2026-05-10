@@ -1,6 +1,4 @@
-// Package upload handles user-uploaded files. Currently it manages avatar
-// images: validation, resizing, and storage. Other upload types (post
-// attachments) are handled in Task 7.1.
+// Package upload handles user-uploaded files: avatar images and post attachments.
 package upload
 
 import (
@@ -16,6 +14,9 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"time"
+
+	"github.com/google/uuid"
 )
 
 const (
@@ -26,6 +27,98 @@ const (
 // AvatarResult holds the persisted avatar's URL path.
 type AvatarResult struct {
 	URL string // e.g. "/uploads/avatars/42.jpg"
+}
+
+// AttachmentResult holds metadata about a saved attachment file.
+type AttachmentResult struct {
+	StoragePath string // relative to uploadDir, e.g. "attachments/2026/05/{uuid}.jpg"
+	Filename    string // original filename from the upload
+	ContentType string
+	SizeBytes   int64
+}
+
+// SaveAttachment validates and stores an uploaded file.
+// It checks the MIME type against allowedTypes, enforces maxBytes, then writes
+// the file to uploadDir/attachments/{year}/{month}/{uuid}.{ext}.
+func SaveAttachment(r io.Reader, originalFilename string, allowedTypes []string, maxBytes int64, uploadDir string) (*AttachmentResult, error) {
+	sniff := make([]byte, 512)
+	n, err := io.ReadFull(r, sniff)
+	if err != nil && err != io.ErrUnexpectedEOF {
+		return nil, fmt.Errorf("read attachment header: %w", err)
+	}
+	sniff = sniff[:n]
+	mimeType := http.DetectContentType(sniff)
+
+	ext, ok := extForMIME(mimeType, allowedTypes)
+	if !ok {
+		return nil, fmt.Errorf("file type %q is not allowed", mimeType)
+	}
+
+	limited := io.LimitReader(io.MultiReader(bytes.NewReader(sniff), r), maxBytes+1)
+	raw, err := io.ReadAll(limited)
+	if err != nil {
+		return nil, fmt.Errorf("read attachment: %w", err)
+	}
+	if int64(len(raw)) > maxBytes {
+		return nil, fmt.Errorf("file exceeds the %d MB size limit", maxBytes/(1<<20))
+	}
+
+	now := time.Now()
+	dir := filepath.Join(uploadDir, "attachments",
+		strconv.Itoa(now.Year()),
+		fmt.Sprintf("%02d", now.Month()),
+	)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return nil, fmt.Errorf("create attachment directory: %w", err)
+	}
+
+	storedName := uuid.New().String() + "." + ext
+	dst := filepath.Join(dir, storedName)
+	if err := os.WriteFile(dst, raw, 0o644); err != nil {
+		return nil, fmt.Errorf("write attachment: %w", err)
+	}
+
+	relPath := filepath.Join("attachments",
+		strconv.Itoa(now.Year()),
+		fmt.Sprintf("%02d", now.Month()),
+		storedName,
+	)
+
+	return &AttachmentResult{
+		StoragePath: filepath.ToSlash(relPath),
+		Filename:    originalFilename,
+		ContentType: mimeType,
+		SizeBytes:   int64(len(raw)),
+	}, nil
+}
+
+// extForMIME returns the file extension for mimeType if it appears in allowedTypes.
+func extForMIME(mimeType string, allowedTypes []string) (string, bool) {
+	allowed := false
+	for _, t := range allowedTypes {
+		if t == mimeType {
+			allowed = true
+			break
+		}
+	}
+	if !allowed {
+		return "", false
+	}
+	switch mimeType {
+	case "image/jpeg":
+		return "jpg", true
+	case "image/png":
+		return "png", true
+	case "image/gif":
+		return "gif", true
+	case "image/webp":
+		return "webp", true
+	case "application/pdf":
+		return "pdf", true
+	case "application/zip":
+		return "zip", true
+	}
+	return "", false
 }
 
 // SaveAvatar reads from r, detects MIME type, validates size, center-crops,

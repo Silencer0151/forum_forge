@@ -1,0 +1,74 @@
+{{define "search_results"}}
+{{if not .Query}}
+<div class="ff-card" style="text-align:center;padding:var(--ff-sp-4);">
+    <p class="ff-text-muted" style="margin:0;">Enter a search term above to find posts.</p>
+</div>
+{{else if not .Results}}
+<div class="ff-card" style="text-align:center;padding:var(--ff-sp-4);">
+    <p class="ff-text-muted" style="margin:0;">
+        No posts matching <strong>&ldquo;{{.Query}}&rdquo;</strong>.
+    </p>
+</div>
+{{else}}
+
+<p class="ff-text-muted" style="margin-bottom:var(--ff-sp-2);font-size:0.9rem;">
+    {{.Total}} {{if eq .Total 1}}result{{else}}results{{end}} for <strong>&ldquo;{{.Query}}&rdquo;</strong>
+</p>
+
+<div class="ff-thread-list">
+{{range .Results}}
+<div class="ff-card ff-mb-2">
+    <div style="margin-bottom:var(--ff-sp-1);">
+        <a class="ff-link" href="/t/{{.ThreadID}}#post-{{.PostID}}"
+           style="font-weight:600;font-size:1rem;">{{.ThreadTitle}}</a>
+    </div>
+    <div style="margin-bottom:var(--ff-sp-1);color:var(--ff-text-muted);font-size:0.9rem;line-height:1.5;">
+        {{.Snippet}}
+    </div>
+    <div style="font-size:0.8rem;color:var(--ff-text-muted);">
+        <span>by <strong>{{.AuthorUsername}}</strong></span>
+        <span style="margin-left:var(--ff-sp-2);">{{formatTime .CreatedAt}}</span>
+        <a class="ff-link" href="/t/{{.ThreadID}}#post-{{.PostID}}"
+           style="margin-left:var(--ff-sp-2);font-size:0.8rem;">View post &rarr;</a>
+    </div>
+</div>
+{{end}}
+</div>
+
+{{$pag := .Pagination}}
+{{if $pag}}
+{{if gt $pag.TotalPages 1}}
+<nav class="ff-pagination" aria-label="Search result pages">
+    {{if $pag.HasPrev}}
+    <a class="ff-pagination__link"
+       href="/search?q={{$pag.Query}}&page={{$pag.PrevPage}}"
+       hx-get="/search?q={{$pag.Query}}&page={{$pag.PrevPage}}"
+       hx-target="#results"
+       hx-swap="innerHTML"
+       hx-push-url="true"
+       aria-label="Previous page">&laquo;</a>
+    {{end}}
+    {{range $pag.Pages}}
+    <a class="ff-pagination__link{{if eq . $pag.CurrentPage}} ff-pagination__link--active{{end}}"
+       href="/search?q={{$pag.Query}}&page={{.}}"
+       hx-get="/search?q={{$pag.Query}}&page={{.}}"
+       hx-target="#results"
+       hx-swap="innerHTML"
+       hx-push-url="true"
+       {{if eq . $pag.CurrentPage}}aria-current="page"{{end}}>{{.}}</a>
+    {{end}}
+    {{if $pag.HasNext}}
+    <a class="ff-pagination__link"
+       href="/search?q={{$pag.Query}}&page={{$pag.NextPage}}"
+       hx-get="/search?q={{$pag.Query}}&page={{$pag.NextPage}}"
+       hx-target="#results"
+       hx-swap="innerHTML"
+       hx-push-url="true"
+       aria-label="Next page">&raquo;</a>
+    {{end}}
+</nav>
+{{end}}
+{{end}}
+
+{{end}}
+{{end}}
