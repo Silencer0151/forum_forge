@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="/static/css/style.css">
     <meta name="csrf-token" content="{{.CSRFToken}}">
     <script src="/static/js/htmx.min.js" defer></script>
+    <script src="/static/js/alpine.min.js" defer></script>
     <script>
         document.addEventListener('htmx:configRequest', function(evt) {
             var token = document.querySelector('meta[name="csrf-token"]');

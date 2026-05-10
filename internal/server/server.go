@@ -55,6 +55,7 @@ type Server struct {
 	userHandlers     *handler.UserHandlers
 	settingsHandlers *handler.SettingsHandlers
 	pmHandlers       *handler.PMHandlers
+	draftHandlers    *handler.DraftHandlers
 }
 
 // AuthDeps bundles the auth-flow building blocks the server needs but does
@@ -104,6 +105,7 @@ func New(cfg *config.Config, st store.Store, r *render.Renderer, staticFS fs.FS,
 		IntegratedMode: cfg.AuthMode == "integrated",
 	})
 	s.pmHandlers = handler.NewPMHandler(st, r)
+	s.draftHandlers = handler.NewDraftHandler(st, r)
 
 	s.registerRoutes()
 	s.handler = s.wrapMiddleware(s.mux)
@@ -161,6 +163,8 @@ func (s *Server) hstsValue() string {
 // Run starts the HTTP server in the configured TLS mode and blocks until ctx
 // is canceled. On cancellation it triggers a graceful shutdown.
 func (s *Server) Run(ctx context.Context) error {
+	go s.runDraftCleanup(ctx)
+
 	switch s.cfg.TLSMode {
 	case "autocert":
 		return s.runAutocert(ctx)
@@ -170,6 +174,23 @@ func (s *Server) Run(ctx context.Context) error {
 		return s.runPlain(ctx)
 	default:
 		return fmt.Errorf("unsupported TLS mode %q", s.cfg.TLSMode)
+	}
+}
+
+// runDraftCleanup deletes drafts older than 30 days once per day.
+func (s *Server) runDraftCleanup(ctx context.Context) {
+	ticker := time.NewTicker(24 * time.Hour)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			cutoff := time.Now().Add(-30 * 24 * time.Hour)
+			if err := s.store.CleanupOldDrafts(context.Background(), cutoff); err != nil {
+				slog.Warn("draft cleanup", "error", err)
+			}
+		}
 	}
 }
 
@@ -265,10 +286,10 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("GET /admin/categories", stub)
 	s.mux.HandleFunc("POST /admin/categories", stub)
 
-	// Drafts (spec.md §6.2 — auto-save endpoints)
-	s.mux.HandleFunc("GET /drafts", stub)
-	s.mux.HandleFunc("POST /drafts", stub)
-	s.mux.HandleFunc("DELETE /drafts/{id}", stub)
+	// Drafts (Task 5.4 — auto-save endpoints).
+	s.mux.HandleFunc("GET /drafts", s.draftHandlers.GetDraft)
+	s.mux.HandleFunc("POST /drafts", s.draftHandlers.UpsertDraft)
+	s.mux.HandleFunc("DELETE /drafts/{id}", s.draftHandlers.DeleteDraft)
 }
 
 // ── handlers ──────────────────────────────────────────────────────────────────

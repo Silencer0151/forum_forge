@@ -192,6 +192,15 @@ func (h *PostHandlers) ThreadPage(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	var draftBody string
+	var draftID int64
+	if user != nil {
+		if d, dErr := h.store.GetDraftByThread(ctx, user.ID, threadID); dErr == nil {
+			draftBody = d.Body
+			draftID = d.ID
+		}
+	}
+
 	data := BaseData(r)
 	data["Title"] = thread.Title
 	data["Thread"] = thread
@@ -204,6 +213,8 @@ func (h *PostHandlers) ThreadPage(w http.ResponseWriter, r *http.Request) {
 	data["CanMod"] = canMod
 	data["FormFormat"] = string(model.BodyFormatMarkdown)
 	data["QuoteText"] = quoteText
+	data["DraftBody"] = draftBody
+	data["DraftID"] = draftID
 
 	if render.IsHTMXRequest(r) {
 		if err := h.renderer.RenderContent(w, "thread.html", data); err != nil {
@@ -296,6 +307,13 @@ func (h *PostHandlers) ReplyToThread(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.store.IncrementPostCount(ctx, user.ID); err != nil {
 		slog.Warn("increment post count", "user_id", user.ID, "error", err)
+	}
+
+	// Best-effort: delete any saved draft for this thread now that the reply is posted.
+	if d, dErr := h.store.GetDraftByThread(ctx, user.ID, threadID); dErr == nil {
+		if dErr := h.store.DeleteDraft(ctx, d.ID); dErr != nil {
+			slog.Warn("delete draft after reply", "thread_id", threadID, "error", dErr)
+		}
 	}
 
 	if render.IsHTMXRequest(r) {
