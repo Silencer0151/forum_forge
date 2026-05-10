@@ -48,14 +48,15 @@ type Server struct {
 	handler       http.Handler
 	authenticator auth.Authenticator
 
-	authHandlers     *handler.AuthHandlers
-	categoryHandlers *handler.CategoryHandlers
-	threadHandlers   *handler.ThreadHandlers
-	postHandlers     *handler.PostHandlers
-	userHandlers     *handler.UserHandlers
-	settingsHandlers *handler.SettingsHandlers
-	pmHandlers       *handler.PMHandlers
-	draftHandlers    *handler.DraftHandlers
+	authHandlers        *handler.AuthHandlers
+	categoryHandlers    *handler.CategoryHandlers
+	threadHandlers      *handler.ThreadHandlers
+	postHandlers        *handler.PostHandlers
+	userHandlers        *handler.UserHandlers
+	settingsHandlers    *handler.SettingsHandlers
+	pmHandlers          *handler.PMHandlers
+	draftHandlers       *handler.DraftHandlers
+	moderationHandlers  *handler.ModerationHandlers
 }
 
 // AuthDeps bundles the auth-flow building blocks the server needs but does
@@ -106,6 +107,7 @@ func New(cfg *config.Config, st store.Store, r *render.Renderer, staticFS fs.FS,
 	})
 	s.pmHandlers = handler.NewPMHandler(st, r)
 	s.draftHandlers = handler.NewDraftHandler(st, r)
+	s.moderationHandlers = handler.NewModerationHandler(st, r)
 
 	s.registerRoutes()
 	s.handler = s.wrapMiddleware(s.mux)
@@ -273,12 +275,12 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("GET /auth/reset-password", s.authHandlers.ResetPasswordPage)
 	s.mux.HandleFunc("POST /auth/reset-password", s.authHandlers.ResetPassword)
 
-	// Moderation
-	s.mux.HandleFunc("GET /mod/reports", stub)
-	s.mux.HandleFunc("POST /mod/reports/{id}/review", stub)
-	s.mux.HandleFunc("POST /mod/threads/{id}/lock", stub)
-	s.mux.HandleFunc("POST /mod/threads/{id}/pin", stub)
-	s.mux.HandleFunc("POST /mod/users/{id}/ban", stub)
+	// Moderation (Task 6.1).
+	s.mux.HandleFunc("GET /mod/reports", s.moderationHandlers.ReportsQueue)
+	s.mux.HandleFunc("POST /mod/reports/{id}/review", s.moderationHandlers.ReviewReport)
+	s.mux.HandleFunc("POST /mod/threads/{id}/lock", s.moderationHandlers.LockThread)
+	s.mux.HandleFunc("POST /mod/threads/{id}/pin", s.moderationHandlers.PinThread)
+	s.mux.HandleFunc("POST /mod/users/{id}/ban", s.moderationHandlers.BanUserByID)
 
 	// Admin
 	s.mux.HandleFunc("GET /admin/settings", stub)

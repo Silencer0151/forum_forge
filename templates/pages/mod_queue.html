@@ -1,0 +1,111 @@
+{{define "content"}}
+<div>
+
+<nav class="ff-breadcrumbs" aria-label="Breadcrumb">
+    <ol class="ff-breadcrumbs__list">
+        <li class="ff-breadcrumbs__item"><a href="/">Forum Home</a></li>
+        <li class="ff-breadcrumbs__item ff-breadcrumbs__item--current" aria-current="page">Moderation Queue</li>
+    </ol>
+</nav>
+
+<div class="ff-page-header">
+    <h1 class="ff-page-header__title">Moderation Queue</h1>
+    <p class="ff-page-header__sub">
+        {{if .Reports}}
+            {{len .Reports}} open {{if eq (len .Reports) 1}}report{{else}}reports{{end}} on this page
+        {{else}}
+            No open reports
+        {{end}}
+    </p>
+</div>
+
+{{template "pagination" .Pagination}}
+
+<div id="reports-list">
+{{if .Reports}}
+{{range .Reports}}
+<div class="ff-card ff-mt-2" id="report-{{.Report.ID}}">
+
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:var(--ff-sp-2);flex-wrap:wrap;margin-bottom:var(--ff-sp-2);">
+        <div>
+            <span class="ff-text-muted" style="font-size:0.85rem;">
+                Report #{{.Report.ID}}
+                &middot; Reported by <strong>{{.ReporterName}}</strong>
+                &middot; {{formatTime .Report.CreatedAt}}
+                {{if .PostAuthorName}}
+                &middot; Post by <strong>{{.PostAuthorName}}</strong>
+                {{end}}
+            </span>
+        </div>
+        {{if .Post}}
+        <a class="ff-btn ff-btn--ghost ff-btn--sm"
+           href="/t/{{.Post.ThreadID}}#post-{{.Post.ID}}"
+           target="_blank" rel="noopener noreferrer">View Post &#8599;</a>
+        {{end}}
+    </div>
+
+    <div class="ff-card" style="background:rgba(0,0,0,0.2);margin-bottom:var(--ff-sp-2);padding:var(--ff-sp-2);">
+        <p style="margin:0 0 var(--ff-sp-1) 0;font-size:0.8rem;color:var(--ff-accent);font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Reported reason</p>
+        <p style="margin:0;">{{.Report.Reason}}</p>
+    </div>
+
+    {{if .Post}}
+        {{if .Post.IsDeleted}}
+        <div class="ff-card" style="background:rgba(0,0,0,0.1);margin-bottom:var(--ff-sp-2);padding:var(--ff-sp-2);">
+            <p class="ff-text-muted" style="margin:0;font-size:0.9rem;font-style:italic;">[This post has already been deleted]</p>
+        </div>
+        {{else if .PostSnippet}}
+        <div class="ff-card" style="background:rgba(0,0,0,0.1);margin-bottom:var(--ff-sp-2);padding:var(--ff-sp-2);">
+            <p style="margin:0 0 var(--ff-sp-1) 0;font-size:0.8rem;color:var(--ff-text-muted);font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Post snippet</p>
+            <p style="margin:0;font-size:0.9rem;white-space:pre-wrap;word-break:break-word;">{{.PostSnippet}}</p>
+        </div>
+        {{end}}
+    {{else}}
+    <div class="ff-card" style="background:rgba(0,0,0,0.1);margin-bottom:var(--ff-sp-2);padding:var(--ff-sp-2);">
+        <p class="ff-text-muted" style="margin:0;font-size:0.9rem;font-style:italic;">[Reported post not found]</p>
+    </div>
+    {{end}}
+
+    <div style="display:flex;gap:var(--ff-sp-1);flex-wrap:wrap;align-items:flex-end;">
+        <form method="POST" action="/mod/reports/{{.Report.ID}}/review"
+              onsubmit="return confirm('Dismiss this report without taking action?')">
+            <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+            <input type="hidden" name="action" value="dismiss">
+            <button type="submit" class="ff-btn ff-btn--secondary ff-btn--sm">Dismiss</button>
+        </form>
+
+        {{if .Post}}{{if not .Post.IsDeleted}}
+        <form method="POST" action="/mod/reports/{{.Report.ID}}/review"
+              onsubmit="return confirm('Delete this post and dismiss the report?')">
+            <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+            <input type="hidden" name="action" value="delete_and_dismiss">
+            <button type="submit" class="ff-btn ff-btn--danger ff-btn--sm">Delete Post + Dismiss</button>
+        </form>
+
+        {{if .PostAuthorName}}
+        <form method="POST" action="/mod/users/{{.Post.AuthorID}}/ban"
+              style="display:flex;gap:var(--ff-sp-1);align-items:flex-end;flex-wrap:wrap;"
+              onsubmit="return confirm('Ban {{.PostAuthorName}}?')">
+            <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+            <input class="ff-input" type="text" name="reason"
+                   placeholder="Ban reason (optional)"
+                   style="height:2rem;padding:0.2rem 0.5rem;font-size:0.85rem;min-width:160px;">
+            <button type="submit" class="ff-btn ff-btn--danger ff-btn--sm">Ban Author</button>
+        </form>
+        {{end}}
+        {{end}}{{end}}
+    </div>
+
+</div>
+{{end}}
+{{else}}
+<div class="ff-card ff-mt-2" style="text-align:center;padding:var(--ff-sp-4);">
+    <p class="ff-text-muted" style="margin:0;">No open reports. The queue is clear.</p>
+</div>
+{{end}}
+</div>
+
+{{template "pagination" .Pagination}}
+
+</div>
+{{end}}

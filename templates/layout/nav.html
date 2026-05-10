@@ -15,8 +15,11 @@
                     <a class="ff-nav__dropdown-item" href="/u/{{.User.Username}}">Profile</a>
                     <a class="ff-nav__dropdown-item" href="/pm/inbox">Messages</a>
                     <a class="ff-nav__dropdown-item" href="/settings">Settings</a>
-                    {{if eq .User.Role "admin"}}
-                    <a class="ff-nav__dropdown-item" href="/admin">Admin Panel</a>
+                    {{if .User.Role.CanModerate}}
+                    <a class="ff-nav__dropdown-item" href="/mod/reports">Mod Queue</a>
+                    {{end}}
+                    {{if .User.Role.CanAdmin}}
+                    <a class="ff-nav__dropdown-item" href="/admin/settings">Admin Panel</a>
                     {{end}}
                     <form class="ff-nav__logout-form" method="post" action="/auth/logout">
                         <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">

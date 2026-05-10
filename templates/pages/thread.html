@@ -22,9 +22,27 @@
                 {{pluralize .Thread.ReplyCount "reply" "replies"}} &middot; {{pluralize .Thread.ViewCount "view" "views"}}
             </p>
         </div>
-        {{if .CanReply}}
-        <a href="#reply-form" class="ff-btn ff-btn--primary" style="flex-shrink:0;margin-top:0.25rem;">Reply</a>
-        {{end}}
+        <div style="display:flex;gap:var(--ff-sp-1);flex-shrink:0;margin-top:0.25rem;flex-wrap:wrap;align-items:center;">
+            {{if .CanReply}}
+            <a href="#reply-form" class="ff-btn ff-btn--primary">Reply</a>
+            {{end}}
+            {{if .CanMod}}
+            <form method="POST" action="/mod/threads/{{.Thread.ID}}/lock" style="display:inline;">
+                <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+                <button type="submit" class="ff-btn ff-btn--ghost ff-btn--sm"
+                        title="{{if .Thread.IsLocked}}Unlock this thread{{else}}Lock this thread{{end}}">
+                    {{if .Thread.IsLocked}}Unlock{{else}}Lock{{end}}
+                </button>
+            </form>
+            <form method="POST" action="/mod/threads/{{.Thread.ID}}/pin" style="display:inline;">
+                <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+                <button type="submit" class="ff-btn ff-btn--ghost ff-btn--sm"
+                        title="{{if .Thread.IsPinned}}Unpin this thread{{else}}Pin this thread{{end}}">
+                    {{if .Thread.IsPinned}}Unpin{{else}}Pin{{end}}
+                </button>
+            </form>
+            {{end}}
+        </div>
     </div>
 </div>
 

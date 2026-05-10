@@ -92,6 +92,11 @@
                         <input type="hidden" name="_method" value="DELETE">
                         <button type="submit" class="ff-btn ff-btn--danger ff-btn--sm">Delete</button>
                     </form>
+                    {{if .Author}}
+                    <a class="ff-btn ff-btn--ghost ff-btn--sm"
+                       href="/u/{{.Author.Username}}"
+                       title="View author profile for mod actions">Profile</a>
+                    {{end}}
                     {{end}}
                 </div>
             </div>
