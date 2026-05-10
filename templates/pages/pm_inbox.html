@@ -1,0 +1,55 @@
+{{define "content"}}
+<nav class="ff-breadcrumbs" aria-label="Breadcrumb">
+    <ol class="ff-breadcrumbs__list">
+        <li class="ff-breadcrumbs__item"><a href="/">Forum Home</a></li>
+        <li class="ff-breadcrumbs__item ff-breadcrumbs__item--current" aria-current="page">Inbox</li>
+    </ol>
+</nav>
+
+<div class="ff-page-header">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
+        <h1 class="ff-page-header__title">Private Messages</h1>
+        <a href="/pm/new" class="ff-btn ff-btn--primary">New Message</a>
+    </div>
+</div>
+
+{{if .Messages}}
+<div class="ff-card" style="padding:0;overflow:hidden;">
+    <table class="ff-table" style="width:100%;border-collapse:collapse;">
+        <thead>
+            <tr>
+                <th style="padding:var(--ff-sp-2) var(--ff-sp-3);text-align:left;border-bottom:1px solid var(--ff-border);color:var(--ff-text-muted);font-weight:600;font-size:0.875rem;">From</th>
+                <th style="padding:var(--ff-sp-2) var(--ff-sp-3);text-align:left;border-bottom:1px solid var(--ff-border);color:var(--ff-text-muted);font-weight:600;font-size:0.875rem;">Subject</th>
+                <th style="padding:var(--ff-sp-2) var(--ff-sp-3);text-align:left;border-bottom:1px solid var(--ff-border);color:var(--ff-text-muted);font-weight:600;font-size:0.875rem;white-space:nowrap;">Date</th>
+            </tr>
+        </thead>
+        <tbody>
+        {{range .Messages}}
+        <tr style="border-bottom:1px solid var(--ff-border);{{if not .PM.IsRead}}background:rgba(var(--ff-accent-rgb,200,130,50),0.07);{{end}}">
+            <td style="padding:var(--ff-sp-2) var(--ff-sp-3);vertical-align:middle;white-space:nowrap;">
+                <a href="/u/{{.Sender.Username}}" style="color:var(--ff-accent);">{{.Sender.DisplayNameOrUsername}}</a>
+            </td>
+            <td style="padding:var(--ff-sp-2) var(--ff-sp-3);vertical-align:middle;">
+                <a href="/pm/{{.PM.ID}}" style="font-weight:{{if not .PM.IsRead}}700{{else}}400{{end}};color:var(--ff-text);">
+                    {{if not .PM.IsRead}}<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--ff-accent);margin-right:6px;vertical-align:middle;"></span>{{end}}
+                    {{truncate .PM.Subject 80}}
+                </a>
+            </td>
+            <td style="padding:var(--ff-sp-2) var(--ff-sp-3);vertical-align:middle;white-space:nowrap;color:var(--ff-text-muted);font-size:0.875rem;">
+                {{formatTime .PM.CreatedAt}}
+            </td>
+        </tr>
+        {{end}}
+        </tbody>
+    </table>
+</div>
+
+{{template "pagination.html" .Pagination}}
+
+{{else}}
+<div class="ff-card" style="text-align:center;padding:var(--ff-sp-5);">
+    <p class="ff-text-muted" style="margin:0;">Your inbox is empty.</p>
+    <a href="/pm/new" class="ff-btn ff-btn--secondary" style="margin-top:var(--ff-sp-2);">Send a message</a>
+</div>
+{{end}}
+{{end}}

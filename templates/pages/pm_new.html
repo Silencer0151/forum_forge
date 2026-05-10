@@ -1,0 +1,55 @@
+{{define "content"}}
+<nav class="ff-breadcrumbs" aria-label="Breadcrumb">
+    <ol class="ff-breadcrumbs__list">
+        <li class="ff-breadcrumbs__item"><a href="/">Forum Home</a></li>
+        <li class="ff-breadcrumbs__item"><a href="/pm">Inbox</a></li>
+        <li class="ff-breadcrumbs__item ff-breadcrumbs__item--current" aria-current="page">New Message</li>
+    </ol>
+</nav>
+
+<div class="ff-page-header">
+    <h1 class="ff-page-header__title">New Message</h1>
+</div>
+
+{{if .Error}}
+<div class="ff-alert ff-alert--error" role="alert">{{.Error}}</div>
+{{end}}
+
+<div class="ff-card ff-mt-2">
+    <form method="POST" action="/pm/new">
+        <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+
+        <div class="ff-form-group">
+            <label class="ff-label" for="to">To</label>
+            <input class="ff-input" type="text" id="to" name="to"
+                   value="{{.ToUsername}}"
+                   placeholder="Username"
+                   required
+                   autocomplete="off">
+        </div>
+
+        <div class="ff-form-group">
+            <label class="ff-label" for="subject">Subject</label>
+            <input class="ff-input" type="text" id="subject" name="subject"
+                   value="{{.Subject}}"
+                   placeholder="Subject"
+                   maxlength="200"
+                   required>
+        </div>
+
+        <div class="ff-form-group">
+            <label class="ff-label" for="body">Message</label>
+            <textarea class="ff-textarea" id="body" name="body"
+                      rows="8"
+                      maxlength="10000"
+                      placeholder="Write your message..."
+                      required>{{.Body}}</textarea>
+        </div>
+
+        <div class="ff-form-actions">
+            <button type="submit" class="ff-btn ff-btn--primary">Send Message</button>
+            <a href="/pm" class="ff-btn ff-btn--ghost">Cancel</a>
+        </div>
+    </form>
+</div>
+{{end}}

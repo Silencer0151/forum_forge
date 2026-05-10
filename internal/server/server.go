@@ -54,6 +54,7 @@ type Server struct {
 	postHandlers     *handler.PostHandlers
 	userHandlers     *handler.UserHandlers
 	settingsHandlers *handler.SettingsHandlers
+	pmHandlers       *handler.PMHandlers
 }
 
 // AuthDeps bundles the auth-flow building blocks the server needs but does
@@ -102,6 +103,7 @@ func New(cfg *config.Config, st store.Store, r *render.Renderer, staticFS fs.FS,
 		Secure:         s.secureCookies(),
 		IntegratedMode: cfg.AuthMode == "integrated",
 	})
+	s.pmHandlers = handler.NewPMHandler(st, r)
 
 	s.registerRoutes()
 	s.handler = s.wrapMiddleware(s.mux)
@@ -226,10 +228,12 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("GET /settings", s.settingsHandlers.SettingsPage)
 	s.mux.HandleFunc("POST /settings", s.settingsHandlers.UpdateSettings)
 
-	// Private messages
-	s.mux.HandleFunc("GET /pm", stub)
-	s.mux.HandleFunc("GET /pm/{pm_id}", stub)
-	s.mux.HandleFunc("POST /pm/new", stub)
+	// Private messages (Task 5.3).
+	s.mux.HandleFunc("GET /pm", s.pmHandlers.InboxPage)
+	s.mux.HandleFunc("GET /pm/new", s.pmHandlers.NewMessagePage)
+	s.mux.HandleFunc("POST /pm/new", s.pmHandlers.SendMessage)
+	s.mux.HandleFunc("GET /pm/{pm_id}", s.pmHandlers.ViewMessage)
+	s.mux.HandleFunc("POST /pm/{pm_id}/delete", s.pmHandlers.DeleteMessage)
 
 	// Search
 	s.mux.HandleFunc("GET /search", stub)

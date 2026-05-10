@@ -1,0 +1,37 @@
+{{define "content"}}
+<nav class="ff-breadcrumbs" aria-label="Breadcrumb">
+    <ol class="ff-breadcrumbs__list">
+        <li class="ff-breadcrumbs__item"><a href="/">Forum Home</a></li>
+        <li class="ff-breadcrumbs__item"><a href="/pm">Inbox</a></li>
+        <li class="ff-breadcrumbs__item ff-breadcrumbs__item--current" aria-current="page">{{truncate .PM.Subject 60}}</li>
+    </ol>
+</nav>
+
+<div class="ff-card ff-mt-2">
+    {{/* Message header */}}
+    <div style="border-bottom:1px solid var(--ff-border);padding-bottom:var(--ff-sp-2);margin-bottom:var(--ff-sp-3);">
+        <h1 style="font-size:1.25rem;margin-bottom:var(--ff-sp-1);">{{.PM.Subject}}</h1>
+        <div style="display:flex;gap:var(--ff-sp-3);flex-wrap:wrap;font-size:0.875rem;color:var(--ff-text-muted);">
+            <span>From: <a href="/u/{{.Sender.Username}}" style="color:var(--ff-accent);">{{.Sender.DisplayNameOrUsername}}</a></span>
+            <span>To: <a href="/u/{{.Recipient.Username}}" style="color:var(--ff-accent);">{{.Recipient.DisplayNameOrUsername}}</a></span>
+            <span>{{formatTime .PM.CreatedAt}}</span>
+        </div>
+    </div>
+
+    {{/* Message body */}}
+    <div class="ff-post-body" style="line-height:1.7;white-space:pre-wrap;word-break:break-word;">{{.PM.Body}}</div>
+
+    {{/* Actions */}}
+    <div style="display:flex;gap:var(--ff-sp-1);margin-top:var(--ff-sp-3);padding-top:var(--ff-sp-2);border-top:1px solid var(--ff-border);flex-wrap:wrap;">
+        {{if .IsRecipient}}
+        <a href="/pm/new?to={{.Sender.Username}}&subject={{.ReplySubject}}" class="ff-btn ff-btn--secondary ff-btn--sm">Reply</a>
+        {{end}}
+        <form method="POST" action="/pm/{{.PM.ID}}/delete"
+              onsubmit="return confirm('Delete this message? This cannot be undone.')">
+            <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+            <button type="submit" class="ff-btn ff-btn--danger ff-btn--sm">Delete</button>
+        </form>
+        <a href="/pm" class="ff-btn ff-btn--ghost ff-btn--sm">Back to Inbox</a>
+    </div>
+</div>
+{{end}}
