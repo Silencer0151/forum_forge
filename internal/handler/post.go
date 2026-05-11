@@ -62,7 +62,7 @@ type PostDisplayRow struct {
 	DeletedByName  string
 	Attachments    []*model.Attachment
 	ReactionCounts []store.ReactionCount
-	UserReacted    map[model.ReactionType]bool
+	UserReacted    map[string]bool
 	Depth          int
 	CanEdit        bool
 	CanDelete      bool
@@ -177,10 +177,10 @@ func (h *PostHandlers) ThreadPage(w http.ResponseWriter, r *http.Request) {
 			counts = nil
 		}
 
-		reacted := make(map[model.ReactionType]bool)
+		reacted := make(map[string]bool)
 		if userReactions != nil {
 			for _, rt := range userReactions[p.Post.ID] {
-				reacted[rt] = true
+				reacted[string(rt)] = true
 			}
 		}
 
@@ -406,7 +406,7 @@ func (h *PostHandlers) ReplyToThread(w http.ResponseWriter, r *http.Request) {
 type ReactionData struct {
 	PostID         int64
 	ReactionCounts []store.ReactionCount
-	UserReacted    map[model.ReactionType]bool
+	UserReacted    map[string]bool
 	CanReact       bool
 }
 
@@ -419,11 +419,11 @@ func (h *PostHandlers) buildSinglePostRow(ctx context.Context, post *model.Post,
 	}
 
 	counts, _ := h.store.GetReactionCounts(ctx, post.ID)
-	reacted := make(map[model.ReactionType]bool)
+	reacted := make(map[string]bool)
 	if user != nil {
 		userReactions, _ := h.store.GetUserReactionsForPosts(ctx, user.ID, []int64{post.ID})
 		for _, rt := range userReactions[post.ID] {
-			reacted[rt] = true
+			reacted[string(rt)] = true
 		}
 	}
 
@@ -852,9 +852,9 @@ func (h *PostHandlers) ReactToPost(w http.ResponseWriter, r *http.Request) {
 
 	counts, _ := h.store.GetReactionCounts(ctx, postID)
 	userReactions, _ := h.store.GetUserReactionsForPosts(ctx, user.ID, []int64{postID})
-	reacted := make(map[model.ReactionType]bool)
+	reacted := make(map[string]bool)
 	for _, rt := range userReactions[postID] {
-		reacted[rt] = true
+		reacted[string(rt)] = true
 	}
 
 	data := ReactionData{
