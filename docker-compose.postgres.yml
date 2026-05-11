@@ -1,0 +1,46 @@
+services:
+  forum:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - forum_uploads:/app/uploads
+      - forum_certs:/app/certs
+    environment:
+      FORUM_BASE_URL: "http://localhost:8080"
+      FORUM_DB_DRIVER: postgres
+      FORUM_DB_DSN: "postgres://forum:forum@postgres:5432/forum?sslmode=disable"
+      FORUM_UPLOAD_PATH: /app/uploads
+      FORUM_SESSION_SECRET: "change-me-in-production"
+      FORUM_TLS_MODE: none
+      FORUM_LOG_FORMAT: json
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: forum
+      POSTGRES_PASSWORD: forum
+      POSTGRES_DB: forum
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U forum -d forum"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  forum_uploads:
+  forum_certs:
+  pgdata:
