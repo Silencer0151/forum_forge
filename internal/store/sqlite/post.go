@@ -50,13 +50,13 @@ func scanPostWithAuthor(rows *sql.Rows) (*store.PostWithAuthor, error) {
 	var parentID, editedBy sql.NullInt64
 	var editedAt dbNullTime
 	var createdAt, updatedAt, userCreatedAt, userLastSeenAt dbTime
-	var isDeleted, banned int
+	var isDeleted, heldForReview, banned int
 	var banReason, externalID, externalSource sql.NullString
 
 	err := rows.Scan(
 		&p.ID, &p.ThreadID, &p.AuthorID, &parentID,
 		&p.Body, &p.BodyFormat, &p.EditCount, &editedAt, &editedBy,
-		&isDeleted, &createdAt, &updatedAt,
+		&isDeleted, &heldForReview, &createdAt, &updatedAt,
 		&u.ID, &u.Username, &u.Email, &u.PasswordHash, &u.DisplayName,
 		&u.AvatarURL, &u.Signature, &u.Role, &u.PostCount,
 		&userCreatedAt, &userLastSeenAt, &banned, &banReason,
@@ -73,6 +73,7 @@ func scanPostWithAuthor(rows *sql.Rows) (*store.PostWithAuthor, error) {
 	}
 	p.EditedAt = editedAt.T
 	p.IsDeleted = isDeleted != 0
+	p.HeldForReview = heldForReview != 0
 	p.CreatedAt = createdAt.T
 	p.UpdatedAt = updatedAt.T
 	u.Banned = banned != 0
@@ -110,10 +111,14 @@ func (s *Store) CreatePost(ctx context.Context, p *model.Post) error {
 		}
 	}
 
+	heldFlag := 0
+	if p.HeldForReview {
+		heldFlag = 1
+	}
 	res, err := s.db.ExecContext(ctx, `
-		INSERT INTO posts (thread_id, author_id, parent_id, body, body_format)
-		VALUES (?, ?, ?, ?, ?)`,
-		p.ThreadID, p.AuthorID, nullInt64(p.ParentID), p.Body, string(p.BodyFormat),
+		INSERT INTO posts (thread_id, author_id, parent_id, body, body_format, held_for_review)
+		VALUES (?, ?, ?, ?, ?, ?)`,
+		p.ThreadID, p.AuthorID, nullInt64(p.ParentID), p.Body, string(p.BodyFormat), heldFlag,
 	)
 	if err != nil {
 		return fmt.Errorf("create post: %w", err)
@@ -162,7 +167,7 @@ func (s *Store) ListPostsByThread(ctx context.Context, threadID int64, page stor
 		SELECT
 			p.id, p.thread_id, p.author_id, p.parent_id,
 			p.body, p.body_format, p.edit_count, p.edited_at, p.edited_by,
-			p.is_deleted, p.created_at, p.updated_at,
+			p.is_deleted, p.held_for_review, p.created_at, p.updated_at,
 			u.id, u.username, u.email, u.password_hash, u.display_name,
 			u.avatar_url, u.signature, u.role, u.post_count,
 			u.created_at, u.last_seen_at, u.banned, u.ban_reason,
@@ -204,7 +209,7 @@ func (s *Store) ListPostsByAuthor(ctx context.Context, userID int64, page store.
 		SELECT
 			p.id, p.thread_id, p.author_id, p.parent_id,
 			p.body, p.body_format, p.edit_count, p.edited_at, p.edited_by,
-			p.is_deleted, p.created_at, p.updated_at,
+			p.is_deleted, p.held_for_review, p.created_at, p.updated_at,
 			u.id, u.username, u.email, u.password_hash, u.display_name,
 			u.avatar_url, u.signature, u.role, u.post_count,
 			u.created_at, u.last_seen_at, u.banned, u.ban_reason,
@@ -249,15 +254,20 @@ func collectPostsWithAuthor(rows *sql.Rows, total, pg, perPage int) (*store.Page
 }
 
 func (s *Store) UpdatePost(ctx context.Context, p *model.Post) error {
+	heldFlag := 0
+	if p.HeldForReview {
+		heldFlag = 1
+	}
 	_, err := s.db.ExecContext(ctx, `
 		UPDATE posts SET
 			body = ?, body_format = ?,
+			held_for_review = ?,
 			edit_count = edit_count + 1,
 			edited_at = CURRENT_TIMESTAMP,
 			edited_by = ?,
 			updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?`,
-		p.Body, string(p.BodyFormat), nullInt64(p.EditedBy), p.ID,
+		p.Body, string(p.BodyFormat), heldFlag, nullInt64(p.EditedBy), p.ID,
 	)
 	if err != nil {
 		return fmt.Errorf("update post: %w", err)
