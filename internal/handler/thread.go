@@ -116,10 +116,15 @@ func (h *ThreadHandlers) SubcategoryPage(w http.ResponseWriter, r *http.Request)
 		perPage = settings.ThreadsPerPage
 	}
 
+	var viewerID int64
+	if user != nil {
+		viewerID = user.ID
+	}
 	result, err := h.store.ListThreads(ctx, store.ThreadListOptions{
 		SubcategoryID: sub.ID,
 		PinnedFirst:   true,
 		Page:          store.PageRequest{Page: page, PerPage: perPage},
+		ViewerID:      viewerID,
 	})
 	if err != nil {
 		slog.Error("list threads", "subcategory_id", sub.ID, "error", err)

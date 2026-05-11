@@ -127,11 +127,16 @@ func New(cfg *config.Config, st store.Store, r *render.Renderer, staticFS fs.FS,
 func (s *Server) Handler() http.Handler { return s.handler }
 
 // wrapMiddleware composes the per-request middleware in spec.md §5.2 order.
-// Outer→inner: Recovery (catch panics, render 500) → Proxy (normalize
+// Outer→inner: Recovery (catch panics, render 500) → Security (static
+// hardening headers — CSP, X-Frame-Options, etc.) → Proxy (normalize
 // r.RemoteAddr/scheme, set HSTS) → Auth (resolve user from session) → Flash
 // (pop flash cookie into context) → Logging (so user_id is available) →
 // RateLimit (per user/IP, after auth so the key reflects the real identity) →
 // CSRF (reject missing/mismatched tokens on unsafe methods) → mux.
+//
+// Security sits above Proxy so that error pages rendered by Recovery still
+// receive hardening headers; HSTS is left to Proxy because it must only be
+// sent over actual HTTPS responses.
 func (s *Server) wrapMiddleware(h http.Handler) http.Handler {
 	limiter := middleware.NewLimiter(globalRateLimit, globalRateWindow)
 	renderer := s.renderer
@@ -139,6 +144,7 @@ func (s *Server) wrapMiddleware(h http.Handler) http.Handler {
 		middleware.Recovery(func(w http.ResponseWriter, r *http.Request) {
 			renderer.RenderError(w, http.StatusInternalServerError, nil)
 		}),
+		middleware.Security(middleware.SecurityConfig{}),
 		middleware.Proxy(middleware.ProxyConfig{
 			TrustProxy: s.cfg.TrustProxy,
 			HSTSValue:  s.hstsValue(),

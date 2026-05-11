@@ -1,9 +1,10 @@
 {{define "thread_row"}}
-<div class="ff-thread-row{{if .Thread.IsPinned}} ff-thread-row--pinned{{end}}">
+<div class="ff-thread-row{{if .Thread.IsPinned}} ff-thread-row--pinned{{end}}{{if .Unread}} ff-thread-row--unread{{end}}">
     <div class="ff-thread-row__title-col">
         <a class="ff-thread-row__title" href="/t/{{.Thread.ID}}">
             {{if .Thread.IsPinned}}<span class="ff-thread-badge ff-thread-badge--pin">Pinned</span> {{end}}
             {{if .Thread.IsLocked}}<span class="ff-thread-badge ff-thread-badge--lock">Locked</span> {{end}}
+            {{if .Unread}}<span class="ff-thread-badge ff-thread-badge--new">New</span> {{end}}
             {{.Thread.Title}}
         </a>
         <div class="ff-thread-row__meta">

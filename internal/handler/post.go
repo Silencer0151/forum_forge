@@ -106,6 +106,11 @@ func (h *PostHandlers) ThreadPage(w http.ResponseWriter, r *http.Request) {
 		if err := h.store.IncrementViewCount(ctx, threadID); err != nil {
 			slog.Warn("increment view count", "thread_id", threadID, "error", err)
 		}
+		if user != nil {
+			if err := h.store.MarkThreadRead(ctx, user.ID, threadID, time.Now()); err != nil {
+				slog.Warn("mark thread read", "thread_id", threadID, "user_id", user.ID, "error", err)
+			}
+		}
 	}
 
 	page := pageFromQuery(r)

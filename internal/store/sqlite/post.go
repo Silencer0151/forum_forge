@@ -12,20 +12,20 @@ import (
 )
 
 const postCols = `id, thread_id, author_id, parent_id, body, body_format,
-	edit_count, edited_at, edited_by, is_deleted, created_at, updated_at`
+	edit_count, edited_at, edited_by, is_deleted, held_for_review, created_at, updated_at`
 
 func scanPost(row rowScanner) (*model.Post, error) {
 	var p model.Post
 	var parentID, editedBy sql.NullInt64
 	var editedAt dbNullTime
 	var createdAt, updatedAt dbTime
-	var isDeleted int
+	var isDeleted, heldForReview int
 
 	err := row.Scan(
 		&p.ID, &p.ThreadID, &p.AuthorID, &parentID,
 		&p.Body, &p.BodyFormat,
 		&p.EditCount, &editedAt, &editedBy,
-		&isDeleted, &createdAt, &updatedAt,
+		&isDeleted, &heldForReview, &createdAt, &updatedAt,
 	)
 	if err != nil {
 		return nil, err
@@ -38,6 +38,7 @@ func scanPost(row rowScanner) (*model.Post, error) {
 	}
 	p.EditedAt = editedAt.T
 	p.IsDeleted = isDeleted != 0
+	p.HeldForReview = heldForReview != 0
 	p.CreatedAt = createdAt.T
 	p.UpdatedAt = updatedAt.T
 	return &p, nil

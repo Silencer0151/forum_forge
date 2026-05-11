@@ -48,6 +48,7 @@ func scanThreadWithMeta(rows *sql.Rows) (*store.ThreadWithMeta, error) {
 	var lastPostBy sql.NullInt64
 	var authorUsername, authorAvatarURL string
 	var lastPostUsername sql.NullString
+	var unread int
 
 	err := rows.Scan(
 		&t.ID, &t.SubcategoryID, &t.AuthorID, &t.Title,
@@ -57,6 +58,7 @@ func scanThreadWithMeta(rows *sql.Rows) (*store.ThreadWithMeta, error) {
 		&createdAt, &updatedAt,
 		&authorUsername, &authorAvatarURL,
 		&lastPostUsername,
+		&unread,
 	)
 	if err != nil {
 		return nil, err
@@ -74,6 +76,7 @@ func scanThreadWithMeta(rows *sql.Rows) (*store.ThreadWithMeta, error) {
 		Thread:          &t,
 		AuthorUsername:  authorUsername,
 		AuthorAvatarURL: authorAvatarURL,
+		Unread:          unread != 0,
 	}
 	if lastPostUsername.Valid {
 		meta.LastPostUsername = &lastPostUsername.String
@@ -135,20 +138,31 @@ func (s *Store) ListThreads(ctx context.Context, opts store.ThreadListOptions) (
 		orderClause = "t.is_pinned DESC, t.last_post_at DESC"
 	}
 
+	// Unread is computed via a LEFT JOIN to read_status:
+	//   - no row for (viewer, thread) → unread
+	//   - row exists and last_post_at > last_read_at → unread
+	// For guests (ViewerID == 0) the join condition is always false, so unread is always 0.
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT
 			t.id, t.subcategory_id, t.author_id, t.title,
 			t.is_pinned, t.is_locked, t.view_count, t.reply_count,
 			t.last_post_at, t.last_post_by, t.created_at, t.updated_at,
 			u.username, u.avatar_url,
-			lpu.username
+			lpu.username,
+			CASE
+			  WHEN ? = 0 THEN 0
+			  WHEN rs.last_read_at IS NULL THEN 1
+			  WHEN t.last_post_at > rs.last_read_at THEN 1
+			  ELSE 0
+			END AS unread
 		FROM threads t
 		JOIN users u ON u.id = t.author_id
 		LEFT JOIN users lpu ON lpu.id = t.last_post_by
+		LEFT JOIN read_status rs ON rs.thread_id = t.id AND rs.user_id = ?
 		WHERE t.subcategory_id = ?
 		ORDER BY `+orderClause+`
 		LIMIT ? OFFSET ?`,
-		opts.SubcategoryID, perPage, offset,
+		opts.ViewerID, opts.ViewerID, opts.SubcategoryID, perPage, offset,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("list threads: %w", err)

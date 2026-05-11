@@ -11,6 +11,14 @@ type Settings struct {
 	RateLimitPostsPerMinute        int      `json:"rate_limit_posts_per_minute"`
 	RateLimitThreadsPerHour        int      `json:"rate_limit_threads_per_hour"`
 	RequireCaptchaUntilPostCount   int      `json:"require_captcha_until_post_count"`
+	// MaxLinksForNewUsers caps the number of URLs allowed in a post body for
+	// users with PostCount < NewUserLinkPostCount. Existing/established users
+	// are not subject to this cap.
+	MaxLinksForNewUsers  int `json:"max_links_for_new_users"`
+	NewUserLinkPostCount int `json:"new_user_link_post_count"`
+	// KeywordBlocklist is a case-insensitive list of substrings that cause a
+	// post to be held for moderator review when matched in the body.
+	KeywordBlocklist []string `json:"keyword_blocklist"`
 }
 
 func DefaultSettings() Settings {
@@ -23,5 +31,8 @@ func DefaultSettings() Settings {
 		RateLimitPostsPerMinute:      3,
 		RateLimitThreadsPerHour:      5,
 		RequireCaptchaUntilPostCount: 5,
+		MaxLinksForNewUsers:          2,
+		NewUserLinkPostCount:         10,
+		KeywordBlocklist:             []string{},
 	}
 }

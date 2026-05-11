@@ -29,6 +29,9 @@ type Post struct {
 	EditedAt   *time.Time `json:"edited_at,omitempty"`
 	EditedBy   *int64     `json:"edited_by,omitempty"`
 	IsDeleted  bool       `json:"is_deleted"`
-	CreatedAt  time.Time  `json:"created_at"`
-	UpdatedAt  time.Time  `json:"updated_at"`
+	// HeldForReview marks posts that tripped the keyword blocklist; they are
+	// hidden from everyone except the author and moderators until reviewed.
+	HeldForReview bool      `json:"held_for_review"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
 }

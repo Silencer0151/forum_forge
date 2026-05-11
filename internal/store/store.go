@@ -27,6 +27,9 @@ type ThreadListOptions struct {
 	SubcategoryID int64
 	PinnedFirst   bool
 	Page          PageRequest
+	// ViewerID, when non-zero, populates ThreadWithMeta.Unread by joining read_status.
+	// Zero (guest) leaves Unread false for every row.
+	ViewerID int64
 }
 
 // ThreadWithMeta joins a thread with its author and last-post information for listing pages.
@@ -35,6 +38,9 @@ type ThreadWithMeta struct {
 	AuthorUsername   string
 	AuthorAvatarURL  string
 	LastPostUsername *string
+	// Unread is true when the viewer has never read this thread, or its
+	// last_post_at is newer than the viewer's last_read_at. Always false for guests.
+	Unread bool
 }
 
 // PostWithAuthor joins a post with its full author record for display.
@@ -191,6 +197,11 @@ type SearchStore interface {
 	Search(ctx context.Context, query string, page PageRequest) (*PageResult[SearchResult], error)
 }
 
+// ReadStatusStore tracks per-user thread read timestamps used to render unread indicators.
+type ReadStatusStore interface {
+	MarkThreadRead(ctx context.Context, userID, threadID int64, at time.Time) error
+}
+
 // ErrNotFound is returned by Get* methods when the requested record does not exist.
 var ErrNotFound = errors.New("store: not found")
 
@@ -208,4 +219,5 @@ type Store interface {
 	SettingsStore
 	AttachmentStore
 	SearchStore
+	ReadStatusStore
 }

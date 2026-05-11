@@ -542,6 +542,12 @@ hr {
     color: var(--ff-text-secondary);
     border: 1px solid var(--ff-border);
 }
+.ff-thread-badge--new {
+    background: var(--ff-accent);
+    color: var(--ff-bg-primary);
+    border: 1px solid var(--ff-accent);
+}
+.ff-thread-row--unread .ff-thread-row__title { font-weight: 700; }
 
 /* ---- Category cards --------------------------------------- */
 .ff-category {
