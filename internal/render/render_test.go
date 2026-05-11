@@ -19,7 +19,7 @@ func minimalFS() fstest.MapFS {
 			Data: []byte(`{{define "content"}}<main>{{.Title}}</main>{{end}}`),
 		},
 		"partials/snippet.html": {
-			Data: []byte(`<span>{{.Text}}</span>`),
+			Data: []byte(`{{define "snippet"}}<span>{{.Text}}</span>{{end}}`),
 		},
 	}
 }

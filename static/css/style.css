@@ -223,6 +223,16 @@ hr {
     box-shadow: 0 4px 16px rgba(0,0,0,0.4);
     z-index: 200;
 }
+/* Bridge the 4px gap above the dropdown so the cursor can transit from
+   the username to the menu items without losing :hover on .ff-nav__user. */
+.ff-nav__dropdown::before {
+    content: '';
+    position: absolute;
+    top: -4px;
+    left: 0;
+    right: 0;
+    height: 4px;
+}
 .ff-nav__dropdown-item {
     display: block;
     padding: 0.45em 1em;
