@@ -100,9 +100,14 @@ func New(cfg *config.Config, st store.Store, r *render.Renderer, staticFS fs.FS,
 		authDeps.Service, authDeps.Tokens, authDeps.Mailer, r,
 		handler.AuthConfig{Secure: s.secureCookies(), BaseURL: cfg.BaseURL},
 	)
+	spamCfg := handler.SpamConfig{
+		CaptchaProvider: cfg.CaptchaProvider,
+		CaptchaSiteKey:  cfg.CaptchaSiteKey,
+		CaptchaSecret:   cfg.CaptchaSecret,
+	}
 	s.categoryHandlers = handler.NewCategory(st, r)
-	s.threadHandlers = handler.NewThreadHandler(st, r)
-	s.postHandlers = handler.NewPostHandler(st, r)
+	s.threadHandlers = handler.NewThreadHandler(st, r, spamCfg)
+	s.postHandlers = handler.NewPostHandler(st, r, spamCfg)
 	s.userHandlers = handler.NewUserHandler(st, r)
 	s.settingsHandlers = handler.NewSettingsHandler(st, r, authDeps.Service, cfg.UploadPath, handler.SettingsConfig{
 		Secure:         s.secureCookies(),

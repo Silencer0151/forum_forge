@@ -24,11 +24,32 @@ const (
 type ThreadHandlers struct {
 	store    store.Store
 	renderer *render.Renderer
+	spam     SpamConfig
 }
 
 // NewThreadHandler constructs a ThreadHandlers.
-func NewThreadHandler(st store.Store, r *render.Renderer) *ThreadHandlers {
-	return &ThreadHandlers{store: st, renderer: r}
+func NewThreadHandler(st store.Store, r *render.Renderer, spam SpamConfig) *ThreadHandlers {
+	return &ThreadHandlers{store: st, renderer: r, spam: spam}
+}
+
+// runSpamChecks mirrors PostHandlers.runSpamChecks for thread (OP-post) creation.
+// Returns "" when the submission may proceed or a user-facing message otherwise.
+func (h *ThreadHandlers) runSpamChecks(r *http.Request, user *model.User, body string, settings *model.Settings) string {
+	if settings.NewUserLinkPostCount > 0 && user.PostCount < settings.NewUserLinkPostCount {
+		if settings.MaxLinksForNewUsers >= 0 && middleware.CountURLs(body) > settings.MaxLinksForNewUsers {
+			return fmt.Sprintf("Posts from new users may contain at most %d link(s).", settings.MaxLinksForNewUsers)
+		}
+	}
+	if middleware.NeedsCaptcha(h.spam.CaptchaProvider, user.PostCount, settings.RequireCaptchaUntilPostCount) {
+		token := r.FormValue("h-captcha-response")
+		if token == "" {
+			token = r.FormValue("captcha_response")
+		}
+		if err := middleware.ValidateCaptcha(h.spam.CaptchaProvider, h.spam.CaptchaSecret, token, middleware.ClientIP(r)); err != nil {
+			return "CAPTCHA verification failed. Please try again."
+		}
+	}
+	return ""
 }
 
 // PaginationData holds pre-computed pagination state for templates.
@@ -260,6 +281,16 @@ func (h *ThreadHandlers) CreateThread(w http.ResponseWriter, r *http.Request) {
 		formErr = "Post body is required."
 	}
 
+	settings, _ := h.store.GetSettings(ctx)
+	if settings == nil {
+		def := model.DefaultSettings()
+		settings = &def
+	}
+
+	if formErr == "" {
+		formErr = h.runSpamChecks(r, user, body, settings)
+	}
+
 	if formErr != "" {
 		data := BaseData(r)
 		data["Title"] = "New Thread"
@@ -294,12 +325,13 @@ func (h *ThreadHandlers) CreateThread(w http.ResponseWriter, r *http.Request) {
 	}
 
 	post := &model.Post{
-		ThreadID:   thread.ID,
-		AuthorID:   user.ID,
-		Body:       body,
-		BodyFormat: format,
-		CreatedAt:  now,
-		UpdatedAt:  now,
+		ThreadID:      thread.ID,
+		AuthorID:      user.ID,
+		Body:          body,
+		BodyFormat:    format,
+		HeldForReview: middleware.CheckKeywords(body, settings.KeywordBlocklist) != "",
+		CreatedAt:     now,
+		UpdatedAt:     now,
 	}
 	if err := h.store.CreatePost(ctx, post); err != nil {
 		slog.Error("create op post", "thread_id", thread.ID, "error", err)

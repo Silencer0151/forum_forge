@@ -55,6 +55,10 @@ func Proxy(cfg ProxyConfig) func(http.Handler) http.Handler {
 	}
 }
 
+// ClientIP exposes the resolved client IP to callers outside this package
+// (e.g. handlers building rate-limit keys or CAPTCHA verification calls).
+func ClientIP(r *http.Request) string { return clientIP(r) }
+
 // clientIP returns the request's client IP, preferring the value set by the
 // Proxy middleware (when TRUST_PROXY is on) and falling back to RemoteAddr.
 // Used by the rate limit middleware and the request logger.

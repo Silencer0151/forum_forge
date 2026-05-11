@@ -1,4 +1,4 @@
--- 003_spam_protection.up.sql: hold-for-review flag for posts that trip the
+-- 004_spam_protection.up.sql: hold-for-review flag for posts that trip the
 -- admin-defined keyword blocklist (Task 8.2). Held posts are visible only to
 -- their author and moderators until reviewed.
 

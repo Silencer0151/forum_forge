@@ -22,20 +22,31 @@ const (
 	reportRateWindow    = time.Hour
 )
 
+// SpamConfig carries the deployment-level CAPTCHA settings handlers need when
+// validating post/thread submissions. Per-forum tunables (link limits, keyword
+// blocklist, captcha threshold) live in the admin Settings record.
+type SpamConfig struct {
+	CaptchaProvider string
+	CaptchaSiteKey  string
+	CaptchaSecret   string
+}
+
 // PostHandlers handles thread-view and reply endpoints.
 type PostHandlers struct {
-	store               store.Store
-	renderer            *render.Renderer
-	reportLimiter       *middleware.Limiter
-	attachmentHandlers  *AttachmentHandlers
+	store              store.Store
+	renderer           *render.Renderer
+	reportLimiter      *middleware.Limiter
+	attachmentHandlers *AttachmentHandlers
+	spam               SpamConfig
 }
 
 // NewPostHandler constructs a PostHandlers.
-func NewPostHandler(st store.Store, r *render.Renderer) *PostHandlers {
+func NewPostHandler(st store.Store, r *render.Renderer, spam SpamConfig) *PostHandlers {
 	return &PostHandlers{
 		store:         st,
 		renderer:      r,
 		reportLimiter: middleware.NewLimiter(reportRateLimit, reportRateWindow),
+		spam:          spam,
 	}
 }
 
@@ -58,6 +69,7 @@ type PostDisplayRow struct {
 	CanReport      bool
 	CanReact       bool
 	CanQuote       bool
+	HeldForReview  bool
 }
 
 // ThreadPage serves GET /t/{thread_id}: paginated posts with reply form.
@@ -149,7 +161,16 @@ func (h *PostHandlers) ThreadPage(w http.ResponseWriter, r *http.Request) {
 
 	rows := make([]PostDisplayRow, 0, len(posts.Items))
 	editWindow := time.Duration(editWindowMin) * time.Minute
+	isMod := user != nil && user.Role.CanModerate()
 	for _, p := range posts.Items {
+		// Held-for-review posts are visible only to the author and moderators.
+		if p.Post.HeldForReview {
+			isOwn := user != nil && user.ID == p.Post.AuthorID
+			if !isOwn && !isMod {
+				continue
+			}
+		}
+
 		counts, err := h.store.GetReactionCounts(ctx, p.Post.ID)
 		if err != nil {
 			slog.Warn("get reaction counts", "post_id", p.Post.ID, "error", err)
@@ -172,7 +193,6 @@ func (h *PostHandlers) ThreadPage(w http.ResponseWriter, r *http.Request) {
 
 		isAuthor := user != nil && user.ID == p.Post.AuthorID
 		withinWindow := time.Since(p.Post.CreatedAt) < editWindow
-		isMod := user != nil && user.Role.CanModerate()
 
 		row := PostDisplayRow{
 			Post:           p.Post,
@@ -186,6 +206,7 @@ func (h *PostHandlers) ThreadPage(w http.ResponseWriter, r *http.Request) {
 			CanReport:      user != nil && !isAuthor && !p.Post.IsDeleted,
 			CanReact:       user != nil && !user.Banned && !p.Post.IsDeleted,
 			CanQuote:       user != nil && !p.Post.IsDeleted,
+			HeldForReview:  p.Post.HeldForReview,
 		}
 
 		if p.Post.IsDeleted && p.Post.EditedBy != nil {
@@ -310,15 +331,27 @@ func (h *PostHandlers) ReplyToThread(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	settings, _ := h.store.GetSettings(ctx)
+	if settings == nil {
+		def := model.DefaultSettings()
+		settings = &def
+	}
+
+	if msg := h.runSpamChecks(r, user, body, settings); msg != "" {
+		http.Error(w, msg, http.StatusUnprocessableEntity)
+		return
+	}
+
 	now := time.Now()
 	post := &model.Post{
-		ThreadID:   threadID,
-		AuthorID:   user.ID,
-		ParentID:   parentID,
-		Body:       body,
-		BodyFormat: format,
-		CreatedAt:  now,
-		UpdatedAt:  now,
+		ThreadID:      threadID,
+		AuthorID:      user.ID,
+		ParentID:      parentID,
+		Body:          body,
+		BodyFormat:    format,
+		HeldForReview: middleware.CheckKeywords(body, settings.KeywordBlocklist) != "",
+		CreatedAt:     now,
+		UpdatedAt:     now,
 	}
 
 	if err := h.store.CreatePost(ctx, post); err != nil {
@@ -329,11 +362,6 @@ func (h *PostHandlers) ReplyToThread(w http.ResponseWriter, r *http.Request) {
 
 	// Process any uploaded attachments now that we have the post ID.
 	if h.attachmentHandlers != nil {
-		settings, _ := h.store.GetSettings(ctx)
-		if settings == nil {
-			def := model.DefaultSettings()
-			settings = &def
-		}
 		if _, err := h.attachmentHandlers.SavePostAttachments(r, post, settings); err != nil {
 			slog.Warn("save post attachments", "post_id", post.ID, "error", err)
 		}
@@ -356,7 +384,7 @@ func (h *PostHandlers) ReplyToThread(w http.ResponseWriter, r *http.Request) {
 
 	if render.IsHTMXRequest(r) {
 		editWindowMin := 30
-		if settings, err := h.store.GetSettings(ctx); err == nil && settings.EditWindowMinutes > 0 {
+		if settings != nil && settings.EditWindowMinutes > 0 {
 			editWindowMin = settings.EditWindowMinutes
 		}
 		row, err := h.buildSinglePostRow(ctx, post, user, editWindowMin)
@@ -422,6 +450,7 @@ func (h *PostHandlers) buildSinglePostRow(ctx context.Context, post *model.Post,
 		CanReport:      user != nil && !isAuthor && !post.IsDeleted,
 		CanReact:       user != nil && !user.Banned && !post.IsDeleted,
 		CanQuote:       user != nil && !post.IsDeleted,
+		HeldForReview:  post.HeldForReview,
 	}
 
 	if post.IsDeleted && post.EditedBy != nil {
@@ -433,6 +462,31 @@ func (h *PostHandlers) buildSinglePostRow(ctx context.Context, post *model.Post,
 	}
 
 	return row, nil
+}
+
+// runSpamChecks runs the link-limit and CAPTCHA gates on a submission. It
+// returns "" when the post may proceed or a user-facing error message when it
+// must be rejected. Keyword-blocklist matches are NOT a hard reject — callers
+// set Post.HeldForReview separately so mods can review borderline content.
+func (h *PostHandlers) runSpamChecks(r *http.Request, user *model.User, body string, settings *model.Settings) string {
+	// Link limit applies only to users below the established-user threshold.
+	if settings.NewUserLinkPostCount > 0 && user.PostCount < settings.NewUserLinkPostCount {
+		if settings.MaxLinksForNewUsers >= 0 && middleware.CountURLs(body) > settings.MaxLinksForNewUsers {
+			return fmt.Sprintf("Posts from new users may contain at most %d link(s).", settings.MaxLinksForNewUsers)
+		}
+	}
+
+	// CAPTCHA: required while the user is below RequireCaptchaUntilPostCount.
+	if middleware.NeedsCaptcha(h.spam.CaptchaProvider, user.PostCount, settings.RequireCaptchaUntilPostCount) {
+		token := r.FormValue("h-captcha-response")
+		if token == "" {
+			token = r.FormValue("captcha_response")
+		}
+		if err := middleware.ValidateCaptcha(h.spam.CaptchaProvider, h.spam.CaptchaSecret, token, middleware.ClientIP(r)); err != nil {
+			return "CAPTCHA verification failed. Please try again."
+		}
+	}
+	return ""
 }
 
 // buildQuoteText formats a post body into a markdown block-quote attributed to username.
@@ -653,6 +707,18 @@ func (h *PostHandlers) UpdatePost(w http.ResponseWriter, r *http.Request) {
 	format := model.BodyFormat(r.FormValue("body_format"))
 	if !format.IsValid() {
 		format = model.BodyFormatMarkdown
+	}
+
+	settings, _ := h.store.GetSettings(ctx)
+	if settings == nil {
+		def := model.DefaultSettings()
+		settings = &def
+	}
+
+	// Edits by non-mods that hit the keyword blocklist are re-held; mod edits
+	// are trusted (a mod editing borderline content has effectively reviewed it).
+	if !isMod {
+		post.HeldForReview = middleware.CheckKeywords(body, settings.KeywordBlocklist) != ""
 	}
 
 	now := time.Now()
