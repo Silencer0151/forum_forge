@@ -79,111 +79,111 @@ Visit the welcome thread (`/c/general/announcements` → click the thread).
 
 Visit "What are you working on this week?".
 
-- [ ] Header shows **"4 replies"** (one OP + four replies on this thread).
+- [X] Header shows **"4 replies"** (one OP + four replies on this thread).
 
 Open the locked thread.
 
-- [ ] As alice/bob (members), no reply form appears at the bottom.
-- [ ] Logout, login as moderator — the reply form IS available (mods bypass the lock).
+- [X] As alice/bob (members), no reply form appears at the bottom.
+- [O] Logout, login as moderator — the reply form IS available (mods bypass the lock).
 
 ## 6. Reactions
 
 On the welcome thread OP, look at the reaction button.
 
-- [ ] Count shows **4** likes (Alice, Bob, Carol, Dave reacted).
-- [ ] Click it as the current user — count flips +1 or -1 without a page reload.
-- [ ] Click again — toggles back.
+- [X] Count shows **4** likes (Alice, Bob, Carol, Dave reacted).
+- [X] Click it as the current user — count flips +1 or -1 without a page reload.
+- [X] Click again — toggles back.
 
 ## 7. Reply flow (sanity check on counters)
 
 Login as **bob@forum.test**, open "Beginner question: when to use a goroutine?" and post a reply.
 
-- [ ] Reply appears immediately at the bottom (HTMX append).
-- [ ] After reload, the subcategory listing for that thread shows **"2 replies"** (was 1, now 2). NOT "3".
-- [ ] Last-post username on the subcategory row is now "bob".
+- [X] Reply appears immediately at the bottom (HTMX append).
+- [X] After reload, the subcategory listing for that thread shows **"2 replies"** (was 1, now 2). NOT "3".
+- [X] Last-post username on the subcategory row is now "bob".
 
 ## 8. New thread flow
 
 Login as alice (`/c/general/general-discussion`).
 
-- [ ] "+ New Thread" button visible in top right of the header.
-- [ ] Click → form loads with title input, format selector (markdown default), body textarea.
-- [ ] Submit with a title and body — redirects to `/t/{id}` showing your new thread.
-- [ ] The new thread now appears at the TOP of the subcategory listing (last_post_at = now).
-- [ ] The new thread shows **"0 replies"** (NOT "1 reply").
+- [X] "+ New Thread" button visible in top right of the header.
+- [x] Click → form loads with title input, format selector (markdown default), body textarea.
+- [x] Submit with a title and body — redirects to `/t/{id}` showing your new thread.
+- [O] The new thread now appears at the TOP of the subcategory listing (last_post_at = now).
+- [X] The new thread shows **"0 replies"** (NOT "1 reply").
 
 ## 9. Avatar upload (multipart CSRF fix)
 
 Login as alice, go to `/settings`.
 
-- [ ] Choose a JPEG/PNG/GIF under 2MB. Click **Save Profile**.
-- [ ] You are redirected to `/settings?saved=1` with a "saved" notice — NOT 403, NOT an empty page.
-- [ ] Avatar preview updates.
-- [ ] Visit `/u/alice` — the new avatar replaces the Gravatar identicon.
-- [ ] Confirm `uploads/avatars/{userID}.{ext}` exists on disk.
+- [X] Choose a JPEG/PNG/GIF under 2MB. Click **Save Profile**.
+- [X] You are redirected to `/settings?saved=1` with a "saved" notice — NOT 403, NOT an empty page.
+- [X] Avatar preview updates.
+- [X] Visit `/u/alice` — the new avatar replaces the Gravatar identicon.
+- [X] Confirm `uploads/avatars/{userID}.{ext}` exists on disk.
 
 Try uploading a WebP, BMP, or large (>2MB) image.
 
-- [ ] You see the settings page re-rendered with a clear red error message (NOT an empty page).
+- [X] You see the settings page re-rendered with a clear red error message (NOT an empty page).
 
 ## 10. Messages
 
 Login as alice. Open nav dropdown → **Messages**.
 
-- [ ] Lands on `/pm` (NOT 404).
-- [ ] Empty inbox state with "Send a message" link.
+- [X] Lands on `/pm` (NOT 404).
+- [X] Empty inbox state with "Send a message" link.
 
 Click `/pm/new`, recipient = `bob`, send a message.
 
-- [ ] Redirects to `/pm` inbox.
+- [X] Redirects to `/pm` inbox.
 
 Logout, login as bob, open Messages.
 
-- [ ] Message from alice appears (unread highlight).
-- [ ] Click it → full thread, with **Reply** button pre-filling recipient + "Re: ..." subject.
+- [X] Message from alice appears (unread highlight).
+- [X] Click it → full thread, with **Reply** button pre-filling recipient + "Re: ..." subject.
 
 ## 11. Mod queue
 
 Login as moderator. Nav → **Mod Queue**.
 
-- [ ] One open report visible: "Looks like affiliate spam." (filed by bob against mallory's spam OP).
-- [ ] You can dismiss OR delete-and-dismiss.
+- [X] One open report visible: "Looks like affiliate spam." (filed by bob against mallory's spam OP).
+- [X] You can dismiss OR delete-and-dismiss.
 
 After delete-and-dismiss:
 
-- [ ] The spam thread's OP renders as "[removed by moderator]" placeholder.
-- [ ] The report disappears from the open queue.
+- [X] The spam thread's OP renders as "[removed by moderator]" placeholder.
+- [X] The report disappears from the open queue.
 
 Try banning mallory from her profile.
 
-- [ ] Profile shows "Banned" badge afterwards.
-- [ ] Logout, attempt mallory login → rejected.
+- [X] Profile shows "Banned" badge afterwards.
+- [X] Logout, attempt mallory login → rejected.
 
 ## 12. Admin panel
 
 Login as admin. Nav → **Admin Panel**.
 
-- [ ] **Settings** page shows all configurable fields (edit window, page sizes, rate limits, link limits, keyword blocklist).
-- [ ] **Categories** page lets you create, rename, reorder, delete categories and subcategories.
+- [X] **Settings** page shows all configurable fields (edit window, page sizes, rate limits, link limits, keyword blocklist).
+- [X] **Categories** page lets you create, rename, reorder, delete categories and subcategories.
 
 Try deleting "Hardware". Add a keyword to the blocklist (e.g., "spamme"). Save.
 
-- [ ] Settings reload reflects the change.
+- [O] Settings reload reflects the change.
 
 ## 13. Search
 
 Top nav → Search. Type `goroutine`.
 
-- [ ] Live results appear after a short delay (HTMX `keyup` trigger).
-- [ ] Carol's beginner thread shows up with a highlighted snippet.
-- [ ] Typing nonsense (`xyzzy999`) → "no results" state, no server error.
+- [X] Live results appear after a short delay (HTMX `keyup` trigger).
+- [O] Carol's beginner thread shows up with a highlighted snippet.
+- [X] Typing nonsense (`xyzzy999`) → "no results" state, no server error.
 
 ## 14. Rate limit (optional, slower test)
 
 Login as bob. Try reporting 6 different posts in rapid succession.
 
-- [ ] First 5 succeed (the configured `reportRateLimit = 5/hour`).
-- [ ] 6th returns 429 Too Many Requests with a `Retry-After` header.
+- [X] First 5 succeed (the configured `reportRateLimit = 5/hour`).
+- [X] 6th returns 429 Too Many Requests with a `Retry-After` header.
 
 ---
 
