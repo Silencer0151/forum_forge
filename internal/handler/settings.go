@@ -223,9 +223,10 @@ func (h *SettingsHandlers) newData(r *http.Request, user *model.User) map[string
 }
 
 func (h *SettingsHandlers) renderError(w http.ResponseWriter, r *http.Request, user *model.User, msg string) {
-	w.WriteHeader(http.StatusBadRequest)
 	data := h.newData(r, user)
 	data["Error"] = msg
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(http.StatusBadRequest)
 	h.render(w, "settings.html", data)
 }
 

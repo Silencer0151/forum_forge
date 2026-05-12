@@ -13,7 +13,7 @@
                 <span class="ff-nav__username">{{.User.Username}}</span>
                 <div class="ff-nav__dropdown">
                     <a class="ff-nav__dropdown-item" href="/u/{{.User.Username}}">Profile</a>
-                    <a class="ff-nav__dropdown-item" href="/pm/inbox">Messages</a>
+                    <a class="ff-nav__dropdown-item" href="/pm">Messages</a>
                     <a class="ff-nav__dropdown-item" href="/settings">Settings</a>
                     {{if .User.Role.CanModerate}}
                     <a class="ff-nav__dropdown-item" href="/mod/reports">Mod Queue</a>

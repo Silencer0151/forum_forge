@@ -43,6 +43,12 @@ func (r *Renderer) buildFuncMap() template.FuncMap {
 		"gravatar":    GravatarURL,
 		"formatBytes": FormatBytes,
 		"isImage":     IsImageContentType,
+		// safehtml marks a pre-sanitized string as trusted HTML so html/template
+		// does not escape it. Only use this for content that has already been
+		// HTML-escaped at its source (e.g. search snippets, which escape the
+		// body before wrapping matches in <mark>).
+		"safehtml":  func(s string) template.HTML { return template.HTML(s) },
+		"hasPrefix": strings.HasPrefix,
 	}
 }
 
@@ -158,9 +164,12 @@ func (r *Renderer) RenderContent(w http.ResponseWriter, name string, data any) e
 	return tmpl.ExecuteTemplate(w, "content", data)
 }
 
-// FormatTime formats t as a human-readable string.
+// FormatTime formats t as a human-readable string in the server's local time
+// zone. Database values are stored in UTC; converting to local on display
+// keeps the UI aligned with the operator's "wall clock" rather than UTC,
+// which is the surprising default that users read as "the timestamp is wrong".
 func FormatTime(t time.Time) string {
-	return t.Format("Jan 2, 2006 3:04 PM")
+	return t.Local().Format("Jan 2, 2006 3:04 PM")
 }
 
 // Truncate shortens s to at most n characters, appending "..." if cut.

@@ -213,6 +213,17 @@ func (s *Service) Register(ctx context.Context, in RegisterInput) (*Result, erro
 		return nil, fmt.Errorf("create user: %w", err)
 	}
 
+	// Promote the first registered account to admin so a fresh deployment has
+	// someone who can configure categories and settings. SQLite INTEGER PRIMARY
+	// KEY hands out ID=1 to the first row, and unique-email/username constraints
+	// make it impossible to "re-register" as ID=1 after deletion.
+	if u.ID == 1 {
+		u.Role = model.RoleAdmin
+		if err := s.store.UpdateUser(ctx, u); err != nil {
+			return nil, fmt.Errorf("promote first user to admin: %w", err)
+		}
+	}
+
 	sess, err := s.openSession(ctx, u.ID)
 	if err != nil {
 		return nil, err

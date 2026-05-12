@@ -17,7 +17,10 @@
     </div>
     <div class="ff-thread-row__last-post">
         {{if .LastPostUsername}}
-        <div>{{.LastPostUsername}}</div>
+        <div class="ff-thread-row__last-post-by">
+            <span class="ff-text-muted">Last post by</span>
+            <strong>{{.LastPostUsername}}</strong>
+        </div>
         {{end}}
         <div class="ff-text-muted">{{formatTime .Thread.LastPostAt}}</div>
     </div>

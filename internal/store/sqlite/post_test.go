@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/nitro/forum_forge/internal/model"
 	"github.com/nitro/forum_forge/internal/store"
@@ -88,11 +89,20 @@ func TestPost_CreateUpdatesThreadCounters(t *testing.T) {
 
 	u, th := setupThreadForPost(t, s, ctx, "ctr")
 
+	// CreatePost is now a thin insert; the caller is responsible for
+	// bumping the thread's reply_count + last_post fields via UpdateLastPost.
+	// This mirrors how the reply handler in internal/handler/post.go works.
 	if err := s.CreatePost(ctx, newPost(th.ID, u.ID, "first")); err != nil {
 		t.Fatalf("CreatePost 1: %v", err)
 	}
+	if err := s.UpdateLastPost(ctx, th.ID, u.ID, time.Now().UTC()); err != nil {
+		t.Fatalf("UpdateLastPost 1: %v", err)
+	}
 	if err := s.CreatePost(ctx, newPost(th.ID, u.ID, "second")); err != nil {
 		t.Fatalf("CreatePost 2: %v", err)
+	}
+	if err := s.UpdateLastPost(ctx, th.ID, u.ID, time.Now().UTC()); err != nil {
+		t.Fatalf("UpdateLastPost 2: %v", err)
 	}
 
 	got, err := s.GetThreadByID(ctx, th.ID)

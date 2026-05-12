@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/nitro/forum_forge/internal/model"
 	"github.com/nitro/forum_forge/internal/store"
@@ -128,10 +127,6 @@ func (s *Store) CreatePost(ctx context.Context, p *model.Post) error {
 		return fmt.Errorf("create post last id: %w", err)
 	}
 	p.ID = id
-
-	if err := s.UpdateLastPost(ctx, p.ThreadID, p.AuthorID, time.Now().UTC()); err != nil {
-		return fmt.Errorf("create post update thread: %w", err)
-	}
 	return nil
 }
 

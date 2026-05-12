@@ -44,7 +44,7 @@
             </div>
             <label class="ff-label" for="avatar_url" style="font-weight:normal;">Or paste an image URL</label>
             <input class="ff-input" type="url" id="avatar_url" name="avatar_url"
-                   value="{{.SettingsUser.AvatarURL}}"
+                   value="{{if not (hasPrefix .SettingsUser.AvatarURL "/uploads/")}}{{.SettingsUser.AvatarURL}}{{end}}"
                    placeholder="https://example.com/avatar.jpg"
                    style="margin-top:var(--ff-sp-1);">
             <span class="ff-input-hint">File upload takes priority over URL. Leave blank to keep the current avatar.</span>

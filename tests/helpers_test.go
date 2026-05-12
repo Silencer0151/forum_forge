@@ -130,12 +130,43 @@ func newTestEnv(t *testing.T) *testEnv {
 		},
 	}
 
-	return &testEnv{
+	env := &testEnv{
 		Server:  ts,
 		Client:  client,
 		Store:   st,
 		Capture: capture,
 	}
+
+	// Pre-create a throwaway user to absorb the first-user → admin promotion
+	// from internal/auth/standalone.go. Tests that register their own users
+	// via createTestUser then receive regular member roles, matching the
+	// pre-promotion semantics the test suite was written against.
+	seedFirstAdmin(t, env)
+
+	return env
+}
+
+// seedFirstAdmin registers and logs out a sentinel user (user_id=1) whose only
+// purpose is to receive the first-user → admin promotion. After this runs,
+// `createTestUser` produces RoleMember users, which is what the rest of the
+// suite expects.
+func seedFirstAdmin(t *testing.T, env *testEnv) {
+	t.Helper()
+	csrf := primeCSRF(t, env)
+	resp := mustPostForm(t, env.Client, env.Server.URL+"/auth/register", url.Values{
+		"csrf_token": {csrf},
+		"username":   {"_seed_admin"},
+		"email":      {"_seed_admin@example.test"},
+		"password":   {"seedpassword1"},
+	})
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("seed admin register: status = %d", resp.StatusCode)
+	}
+	resp = mustPostForm(t, env.Client, env.Server.URL+"/auth/logout", url.Values{
+		"csrf_token": {csrf},
+	})
+	resp.Body.Close()
 }
 
 // primeCSRF seeds the CSRF cookie by making a GET to /auth/login and returns

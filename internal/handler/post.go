@@ -221,8 +221,10 @@ func (h *PostHandlers) ThreadPage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	baseURL := fmt.Sprintf("/t/%d", threadID)
-	canReply := user != nil && !user.Banned && !thread.IsLocked && user.Role != model.RoleGuest
 	canMod := user != nil && user.Role.CanModerate()
+	// Locked threads refuse replies from regular members, but moderators and
+	// admins keep posting access so they can resolve the locked discussion.
+	canReply := user != nil && !user.Banned && user.Role != model.RoleGuest && (!thread.IsLocked || canMod)
 
 	quoteText := ""
 	if quoteIDStr := r.URL.Query().Get("quote"); quoteIDStr != "" {

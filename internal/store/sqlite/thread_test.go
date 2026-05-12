@@ -372,8 +372,9 @@ func TestThread_ListWithAuthorInfo(t *testing.T) {
 	if meta.AuthorUsername != u.Username {
 		t.Errorf("AuthorUsername: got %q, want %q", meta.AuthorUsername, u.Username)
 	}
-	// No last post yet; LastPostUsername should be nil.
-	if meta.LastPostUsername != nil {
-		t.Errorf("LastPostUsername: expected nil, got %q", *meta.LastPostUsername)
+	// A brand-new thread treats its OP author as the most recent poster so
+	// the thread row in listings shows a sensible "last post by" value.
+	if meta.LastPostUsername == nil || *meta.LastPostUsername != u.Username {
+		t.Errorf("LastPostUsername: got %v, want %q", meta.LastPostUsername, u.Username)
 	}
 }

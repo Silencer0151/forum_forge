@@ -3,6 +3,7 @@ package sqlite
 import (
 	"context"
 	"fmt"
+	"html"
 	"regexp"
 	"strings"
 
@@ -88,7 +89,9 @@ func (s *Store) Search(ctx context.Context, query string, page store.PageRequest
 }
 
 // buildSnippet extracts a short excerpt of body text around the first query
-// term match and wraps matches in <mark>...</mark> tags.
+// term match and wraps matches in <mark>...</mark> tags. The body is HTML-
+// escaped before <mark> insertion so user-supplied content cannot inject
+// scripts into the rendered search results page.
 func buildSnippet(body, query string) string {
 	words := strings.Fields(query)
 	lower := strings.ToLower(body)
@@ -113,14 +116,16 @@ func buildSnippet(body, query string) string {
 	if end > len(body) {
 		end = len(body)
 	}
-	snippet := body[start:end]
+	snippet := html.EscapeString(body[start:end])
 
-	// Wrap each query word in <mark> tags (case-insensitive).
+	// Wrap each query word in <mark> tags (case-insensitive). Operate on the
+	// already-escaped snippet so the match text remains escaped inside the
+	// <mark> wrapper.
 	for _, w := range words {
 		if w == "" {
 			continue
 		}
-		re, err := regexp.Compile(`(?i)` + regexp.QuoteMeta(w))
+		re, err := regexp.Compile(`(?i)` + regexp.QuoteMeta(html.EscapeString(w)))
 		if err != nil {
 			continue
 		}

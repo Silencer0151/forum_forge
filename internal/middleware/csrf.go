@@ -57,12 +57,16 @@ func CSRF(cfg CSRFConfig) func(http.Handler) http.Handler {
 
 			submitted := r.Header.Get(CSRFHeaderName)
 			if submitted == "" {
-				// ParseForm reads body for POST x-www-form-urlencoded. For
-				// multipart, callers typically use r.FormValue inside their
-				// handler, which is fine — the token can still arrive via
-				// header. Failing ParseForm is non-fatal for the validation
-				// step: we just won't find a form-field token.
-				_ = r.ParseForm()
+				// ParseMultipartForm handles both content types: for
+				// multipart/form-data it parses the body parts and copies
+				// non-file values into r.PostForm; for url-encoded bodies
+				// it calls ParseForm internally and returns ErrNotMultipart,
+				// which we ignore. Using ParseForm alone would silently skip
+				// the body for multipart, leaving r.PostForm empty and the
+				// CSRF token unreadable.
+				if err := r.ParseMultipartForm(32 << 20); err != nil && err != http.ErrNotMultipart {
+					_ = r.ParseForm()
+				}
 				submitted = r.PostFormValue(CSRFFormField)
 			}
 			if submitted == "" || subtle.ConstantTimeCompare([]byte(submitted), []byte(token)) != 1 {

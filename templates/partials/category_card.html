@@ -33,11 +33,11 @@
             <div class="ff-subcategory-row__last-post">
                 {{if and .Stats (gt .Stats.ThreadCount 0)}}
                 <div class="ff-last-post">
-                    {{if .Stats.LastPostUsername}}
-                    <span class="ff-last-post__by">{{.Stats.LastPostUsername}}</span>
-                    {{end}}
                     {{if .Stats.LastThreadTitle}}
                     <a class="ff-last-post__title" href="/c/{{$.Cat.Slug}}/{{.Sub.Slug}}">{{truncate .Stats.LastThreadTitle 50}}</a>
+                    {{end}}
+                    {{if .Stats.LastPostUsername}}
+                    <span class="ff-last-post__by">Last post by <strong>{{.Stats.LastPostUsername}}</strong></span>
                     {{end}}
                     <span class="ff-last-post__time">{{formatTime .Stats.LastPostAt}}</span>
                 </div>

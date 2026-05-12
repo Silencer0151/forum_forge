@@ -85,13 +85,25 @@ func scanThreadWithMeta(rows *sql.Rows) (*store.ThreadWithMeta, error) {
 }
 
 func (s *Store) CreateThread(ctx context.Context, t *model.Thread) error {
+	// The OP is the most recent post by definition, so seed last_post_at/by
+	// with the thread's own timestamp and author. Reply count starts at 0;
+	// only actual replies should increment it.
+	lastPostAt := t.LastPostAt
+	if lastPostAt.IsZero() {
+		lastPostAt = time.Now().UTC()
+	}
+	lastPostBy := nullInt64(&t.AuthorID)
+	if t.LastPostBy != nil {
+		lastPostBy = nullInt64(t.LastPostBy)
+	}
 	res, err := s.db.ExecContext(ctx, `
 		INSERT INTO threads
 			(subcategory_id, author_id, title, is_pinned, is_locked,
 			 view_count, reply_count, last_post_at, last_post_by)
-		VALUES (?, ?, ?, ?, ?, 0, 0, CURRENT_TIMESTAMP, NULL)`,
+		VALUES (?, ?, ?, ?, ?, 0, 0, ?, ?)`,
 		t.SubcategoryID, t.AuthorID, t.Title,
 		boolInt(t.IsPinned), boolInt(t.IsLocked),
+		lastPostAt.UTC().Format("2006-01-02 15:04:05"), lastPostBy,
 	)
 	if err != nil {
 		return fmt.Errorf("create thread: %w", err)

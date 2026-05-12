@@ -5,3 +5,4 @@ certs/
 forum_forge
 .env
 /docs/TASKS.md
+*.exe
