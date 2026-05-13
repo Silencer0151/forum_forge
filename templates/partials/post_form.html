@@ -7,7 +7,21 @@
              var saved = localStorage.getItem('ff_draft_thread_{{.Thread.ID}}');
              if (saved) ta.value = saved;
          }
-     })()">
+     })()"
+     @htmx:after-request.window="
+         if($event.detail.successful && $event.detail.elt && $event.detail.elt.closest('#post-form-card')){
+             // Reset every field by hand so the textarea and file input both
+             // empty out — form.reset() restores defaults, which would
+             // re-load any quote/draft body that was the textarea's initial
+             // value when this partial was rendered.
+             var ta = document.getElementById('reply-body');
+             if(ta){ ta.value = ''; }
+             var fi = document.getElementById('attachments');
+             if(fi){ fi.value = ''; }
+             attachmentPreviews = [];
+             localStorage.removeItem('ff_draft_thread_{{.Thread.ID}}');
+         }
+     ">
     <div class="ff-card__header">
         <h3 class="ff-card__title">Post a Reply</h3>
     </div>
@@ -17,8 +31,7 @@
               hx-post="/t/{{.Thread.ID}}/reply"
               hx-target="#post-list"
               hx-swap="beforeend"
-              hx-encoding="multipart/form-data"
-              hx-on:htmx:after-request="if(event.detail.successful){localStorage.removeItem('ff_draft_thread_{{.Thread.ID}}');this.reset();$data.attachmentPreviews=[]}">
+              hx-encoding="multipart/form-data">
             <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
             <input type="hidden" name="thread_id" value="{{.Thread.ID}}">
 

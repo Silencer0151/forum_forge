@@ -68,6 +68,7 @@ func (h *AdminHandlers) AdminSettingsPage(w http.ResponseWriter, r *http.Request
 	data["Settings"] = settings
 	data["MaxAttachmentSizeMB"] = fmt.Sprintf("%.2f", float64(settings.MaxAttachmentSizeBytes)/(1024*1024))
 	data["AllowedTypesText"] = strings.Join(settings.AllowedAttachmentTypes, "\n")
+	data["KeywordBlocklistText"] = strings.Join(settings.KeywordBlocklist, "\n")
 	data["Notice"] = r.URL.Query().Get("notice")
 	data["Error"] = r.URL.Query().Get("error")
 
@@ -172,6 +173,37 @@ func (h *AdminHandlers) UpdateAdminSettings(w http.ResponseWriter, r *http.Reque
 				current.RequireCaptchaUntilPostCount = n
 			}
 		}
+	}
+	if validationErr == "" {
+		if v := r.FormValue("new_user_link_post_count"); v != "" {
+			if n, err := strconv.Atoi(v); err != nil || n < 0 {
+				validationErr = "New-user post-count threshold must be a non-negative integer."
+			} else {
+				current.NewUserLinkPostCount = n
+			}
+		}
+	}
+	if validationErr == "" {
+		if v := r.FormValue("max_links_for_new_users"); v != "" {
+			if n, err := strconv.Atoi(v); err != nil || n < -1 {
+				validationErr = "Max links for new users must be -1 (disabled), 0 (forbidden), or a positive integer."
+			} else {
+				current.MaxLinksForNewUsers = n
+			}
+		}
+	}
+	if validationErr == "" {
+		// Keyword blocklist accepts an empty submission as "clear all"; that
+		// is why this block always reassigns the slice rather than gating on
+		// v != "" like the numeric fields above.
+		raw := r.FormValue("keyword_blocklist")
+		var keywords []string
+		for _, line := range strings.Split(raw, "\n") {
+			if kw := strings.TrimSpace(line); kw != "" {
+				keywords = append(keywords, kw)
+			}
+		}
+		current.KeywordBlocklist = keywords
 	}
 
 	if validationErr != "" {

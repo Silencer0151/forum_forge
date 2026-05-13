@@ -22,14 +22,21 @@ const (
 
 // ThreadHandlers handles thread listing and creation.
 type ThreadHandlers struct {
-	store    store.Store
-	renderer *render.Renderer
-	spam     SpamConfig
+	store              store.Store
+	renderer           *render.Renderer
+	spam               SpamConfig
+	attachmentHandlers *AttachmentHandlers
 }
 
 // NewThreadHandler constructs a ThreadHandlers.
 func NewThreadHandler(st store.Store, r *render.Renderer, spam SpamConfig) *ThreadHandlers {
 	return &ThreadHandlers{store: st, renderer: r, spam: spam}
+}
+
+// SetAttachmentHandlers wires the attachment sub-handler used when an OP post
+// includes file uploads. Mirrors PostHandlers.SetAttachmentHandlers.
+func (h *ThreadHandlers) SetAttachmentHandlers(ah *AttachmentHandlers) {
+	h.attachmentHandlers = ah
 }
 
 // runSpamChecks mirrors PostHandlers.runSpamChecks for thread (OP-post) creation.
@@ -235,7 +242,10 @@ func (h *ThreadHandlers) CreateThread(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := r.ParseForm(); err != nil {
+	// The new-thread form is multipart (it carries optional file attachments
+	// for the OP post). ParseForm alone does not read multipart bodies, so
+	// fall back to ParseForm only when the body is not multipart.
+	if err := r.ParseMultipartForm(32 << 20); err != nil && err != http.ErrNotMultipart {
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
 	}
@@ -337,6 +347,14 @@ func (h *ThreadHandlers) CreateThread(w http.ResponseWriter, r *http.Request) {
 		slog.Error("create op post", "thread_id", thread.ID, "error", err)
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
+	}
+
+	// Optional attachments on the OP post. Failures are logged but do not
+	// abort thread creation — the thread itself is already persisted.
+	if h.attachmentHandlers != nil {
+		if _, err := h.attachmentHandlers.SavePostAttachments(r, post, settings); err != nil {
+			slog.Warn("save op attachments", "post_id", post.ID, "error", err)
+		}
 	}
 
 	http.Redirect(w, r, fmt.Sprintf("/t/%d", thread.ID), http.StatusSeeOther)

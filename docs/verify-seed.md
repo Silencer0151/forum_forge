@@ -84,7 +84,7 @@ Visit "What are you working on this week?".
 Open the locked thread.
 
 - [X] As alice/bob (members), no reply form appears at the bottom.
-- [O] Logout, login as moderator — the reply form IS available (mods bypass the lock).
+- [X] Logout, login as moderator — the reply form IS available (mods bypass the lock).
 
 ## 6. Reactions
 
@@ -109,7 +109,7 @@ Login as alice (`/c/general/general-discussion`).
 - [X] "+ New Thread" button visible in top right of the header.
 - [x] Click → form loads with title input, format selector (markdown default), body textarea.
 - [x] Submit with a title and body — redirects to `/t/{id}` showing your new thread.
-- [O] The new thread now appears at the TOP of the subcategory listing (last_post_at = now).
+- [X] The new thread now appears at the TOP of the subcategory listing (last_post_at = now).
 - [X] The new thread shows **"0 replies"** (NOT "1 reply").
 
 ## 9. Avatar upload (multipart CSRF fix)

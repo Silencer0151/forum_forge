@@ -17,9 +17,9 @@
 <div class="ff-alert ff-alert--error" role="alert">{{.Error}}</div>
 {{end}}
 
-<div class="ff-card">
+<div class="ff-card" x-data="{attachmentPreviews: []}">
     <div class="ff-card__body">
-        <form method="POST" action="/t/new">
+        <form method="POST" action="/t/new" enctype="multipart/form-data">
             <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
             <input type="hidden" name="cat_slug" value="{{.Category.Slug}}">
             <input type="hidden" name="sub_slug" value="{{.Subcategory.Slug}}">
@@ -55,6 +55,42 @@
                           rows="12"
                           placeholder="Write your post here..."
                           required>{{.FormBody}}</textarea>
+            </div>
+
+            <div class="ff-form-group">
+                <label class="ff-label" for="attachments">Attachments <span class="ff-text-muted">(optional, max 5)</span></label>
+                <input type="file"
+                       class="ff-input"
+                       id="attachments"
+                       name="attachments"
+                       multiple
+                       accept="image/jpeg,image/png,image/gif,image/webp,application/pdf,application/zip"
+                       @change="
+                           attachmentPreviews = [];
+                           Array.from($event.target.files).slice(0, 5).forEach(function(file) {
+                               if (file.type.startsWith('image/')) {
+                                   var reader = new FileReader();
+                                   reader.onload = function(e) {
+                                       attachmentPreviews.push({name: file.name, src: e.target.result, isImage: true});
+                                   };
+                                   reader.readAsDataURL(file);
+                               } else {
+                                   attachmentPreviews.push({name: file.name, src: null, isImage: false});
+                               }
+                           });
+                       ">
+                <p class="ff-text-muted" style="font-size:0.8rem;margin-top:0.25rem">Allowed: JPEG, PNG, GIF, WebP, PDF, ZIP &mdash; size limits set by admin.</p>
+
+                <div x-show="attachmentPreviews.length > 0" class="ff-attachment-previews">
+                    <template x-for="(p, i) in attachmentPreviews" :key="i">
+                        <div class="ff-attachment-preview">
+                            <img x-show="p.isImage" :src="p.src" :alt="p.name"
+                                 class="ff-attachment-preview__thumb" loading="lazy">
+                            <span x-show="!p.isImage" class="ff-attachment-preview__icon">&#128196;</span>
+                            <span class="ff-attachment-preview__name" x-text="p.name"></span>
+                        </div>
+                    </template>
+                </div>
             </div>
 
             <div class="ff-form-actions">

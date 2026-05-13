@@ -120,6 +120,7 @@ func New(cfg *config.Config, st store.Store, r *render.Renderer, staticFS fs.FS,
 	s.searchHandlers = handler.NewSearchHandler(st, r)
 	s.attachmentHandlers = handler.NewAttachmentHandler(st, cfg.UploadPath)
 	s.postHandlers.SetAttachmentHandlers(s.attachmentHandlers)
+	s.threadHandlers.SetAttachmentHandlers(s.attachmentHandlers)
 
 	s.registerRoutes()
 	s.handler = s.wrapMiddleware(s.mux)
@@ -322,6 +323,7 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("POST /mod/reports/{id}/review", s.moderationHandlers.ReviewReport)
 	s.mux.HandleFunc("POST /mod/threads/{id}/lock", s.moderationHandlers.LockThread)
 	s.mux.HandleFunc("POST /mod/threads/{id}/pin", s.moderationHandlers.PinThread)
+	s.mux.HandleFunc("POST /mod/threads/{id}/delete", s.moderationHandlers.DeleteThread)
 	s.mux.HandleFunc("POST /mod/users/{id}/ban", s.moderationHandlers.BanUserByID)
 
 	// Admin (Task 6.3).

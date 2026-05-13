@@ -41,6 +41,14 @@
                     {{if .Thread.IsPinned}}Unpin{{else}}Pin{{end}}
                 </button>
             </form>
+            <form method="POST" action="/mod/threads/{{.Thread.ID}}/delete" style="display:inline;"
+                  onsubmit="return confirm('Permanently delete this thread and ALL of its posts? This cannot be undone.');">
+                <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+                <button type="submit" class="ff-btn ff-btn--danger ff-btn--sm"
+                        title="Permanently delete this thread and all posts">
+                    Delete Thread
+                </button>
+            </form>
             {{end}}
         </div>
     </div>

@@ -249,6 +249,61 @@ func (h *ModerationHandlers) PinThread(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/t/"+strconv.FormatInt(threadID, 10), http.StatusSeeOther)
 }
 
+// DeleteThread handles POST /mod/threads/{id}/delete: hard-deletes the thread
+// and all of its posts via the schema's ON DELETE CASCADE. Used by admins
+// who need to clear a subcategory before deleting it (deletion is refused
+// while threads remain). Restricted to moderators and admins.
+func (h *ModerationHandlers) DeleteThread(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	user, ok := requireMod(w, r)
+	if !ok {
+		return
+	}
+
+	threadID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	// Resolve the parent subcategory before deletion so the redirect can
+	// land back on the subcategory listing instead of a now-404 thread URL.
+	thread, err := h.store.GetThreadByID(ctx, threadID)
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			http.NotFound(w, r)
+			return
+		}
+		slog.Error("get thread for delete", "id", threadID, "error", err)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	sub, err := h.store.GetSubcategoryByID(ctx, thread.SubcategoryID)
+	if err != nil {
+		slog.Error("get subcategory for thread delete redirect", "id", thread.SubcategoryID, "error", err)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+	cat, err := h.store.GetCategoryByID(ctx, sub.CategoryID)
+	if err != nil {
+		slog.Error("get category for thread delete redirect", "id", sub.CategoryID, "error", err)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	if err := h.store.DeleteThread(ctx, threadID); err != nil {
+		slog.Error("delete thread", "id", threadID, "error", err)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	slog.Info("mod deleted thread",
+		"thread_id", threadID, "title", thread.Title,
+		"mod_id", user.ID, "mod_username", user.Username)
+	http.Redirect(w, r, "/c/"+cat.Slug+"/"+sub.Slug, http.StatusSeeOther)
+}
+
 // BanUserByID handles POST /mod/users/{id}/ban: bans a user by ID from the mod panel.
 func (h *ModerationHandlers) BanUserByID(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()

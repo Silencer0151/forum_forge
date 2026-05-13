@@ -83,6 +83,28 @@
                    value="{{.Settings.RequireCaptchaUntilPostCount}}" min="0" max="1000">
             <span class="ff-hint">New users must solve a CAPTCHA until they have this many posts. Set to 0 to disable.</span>
         </div>
+
+        <div class="ff-form-group">
+            <label class="ff-label" for="new_user_link_post_count">"New user" threshold (post count)</label>
+            <input class="ff-input" type="number" id="new_user_link_post_count" name="new_user_link_post_count"
+                   value="{{.Settings.NewUserLinkPostCount}}" min="0" max="1000">
+            <span class="ff-hint">Users below this post count are treated as "new" and subject to the link limit below.</span>
+        </div>
+
+        <div class="ff-form-group">
+            <label class="ff-label" for="max_links_for_new_users">Max links per post (new users)</label>
+            <input class="ff-input" type="number" id="max_links_for_new_users" name="max_links_for_new_users"
+                   value="{{.Settings.MaxLinksForNewUsers}}" min="-1" max="100">
+            <span class="ff-hint">Maximum number of URLs allowed in posts from new users. Set to -1 to disable the limit, 0 to forbid links entirely.</span>
+        </div>
+
+        <div class="ff-form-group">
+            <label class="ff-label" for="keyword_blocklist">Keyword blocklist</label>
+            <textarea class="ff-input" id="keyword_blocklist" name="keyword_blocklist"
+                      rows="6" style="font-family:monospace;font-size:0.85rem;"
+                      placeholder="One keyword per line">{{.KeywordBlocklistText}}</textarea>
+            <span class="ff-hint">One keyword or phrase per line. Posts containing any of these (case-insensitive substring match) are held for moderator review instead of going live immediately.</span>
+        </div>
     </div>
 
     <!-- Attachments -->
