@@ -13,31 +13,12 @@
     </div>
     <div class="ff-card__body">
         <form method="POST" action="/t/{{.Thread.ID}}/reply"
+              id="reply-form-{{.Thread.ID}}"
               enctype="multipart/form-data"
               hx-post="/t/{{.Thread.ID}}/reply"
               hx-target="#post-list"
               hx-swap="beforeend"
-              hx-encoding="multipart/form-data"
-              hx-on::after-request="
-                  if(event.detail.successful){
-                      // Manually clear each field rather than calling form.reset():
-                      // reset() restores fields to the HTML's initial values, so
-                      // if the textarea was rendered with a draft or quote it
-                      // would re-appear instead of going empty.
-                      var ta = document.getElementById('reply-body');
-                      if(ta){ ta.value = ''; }
-                      var fi = document.getElementById('attachments');
-                      if(fi){ fi.value = ''; }
-                      // Clear Alpine's preview list. The form is inside the
-                      // x-data scope, so Alpine.$data on the parent card
-                      // returns the scope where attachmentPreviews lives.
-                      try {
-                          var card = document.getElementById('post-form-card');
-                          if(card && window.Alpine){ Alpine.$data(card).attachmentPreviews = []; }
-                      } catch(e) {}
-                      localStorage.removeItem('ff_draft_thread_{{.Thread.ID}}');
-                  }
-              ">
+              hx-encoding="multipart/form-data">
             <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
             <input type="hidden" name="thread_id" value="{{.Thread.ID}}">
 
@@ -109,4 +90,29 @@
         </form>
     </div>
 </div>
+<script>
+// Clear the reply form after a successful HTMX submission. Done via
+// addEventListener with the literal camelCase event name HTMX dispatches —
+// the hx-on:: attribute shorthand wasn't catching the event reliably across
+// multipart submissions on this build of HTMX 2.0.
+(function(){
+    var form = document.getElementById('reply-form-{{.Thread.ID}}');
+    if (!form || form.__ffCleanupBound) return;
+    form.__ffCleanupBound = true;
+    form.addEventListener('htmx:afterRequest', function(event){
+        if (!event.detail || !event.detail.successful) return;
+        var ta = form.querySelector('#reply-body');
+        if (ta) { ta.value = ''; }
+        var fi = form.querySelector('#attachments');
+        if (fi) { fi.value = ''; }
+        try {
+            var card = document.getElementById('post-form-card');
+            if (card && window.Alpine) {
+                Alpine.$data(card).attachmentPreviews = [];
+            }
+        } catch (e) {}
+        try { localStorage.removeItem('ff_draft_thread_{{.Thread.ID}}'); } catch (e) {}
+    });
+})();
+</script>
 {{end}}
