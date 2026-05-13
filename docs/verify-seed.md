@@ -168,14 +168,14 @@ Login as admin. Nav → **Admin Panel**.
 
 Try deleting "Hardware". Add a keyword to the blocklist (e.g., "spamme"). Save.
 
-- [O] Settings reload reflects the change.
+- [X] Settings reload reflects the change.
 
 ## 13. Search
 
 Top nav → Search. Type `goroutine`.
 
 - [X] Live results appear after a short delay (HTMX `keyup` trigger).
-- [O] Carol's beginner thread shows up with a highlighted snippet.
+- [X] Carol's beginner thread shows up with a highlighted snippet.
 - [X] Typing nonsense (`xyzzy999`) → "no results" state, no server error.
 
 ## 14. Rate limit (optional, slower test)
