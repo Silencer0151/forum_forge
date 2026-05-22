@@ -24,6 +24,16 @@ make build
 
 Open [http://localhost:8080](http://localhost:8080). The first user to register becomes the admin.
 
+### Seed demo content (optional)
+
+For local demos or manual smoke-testing, populate the database with realistic content — categories, threads, posts, and demo accounts spanning admin/moderator/member roles:
+
+```sh
+go run ./cmd/seed -force
+```
+
+Every demo account uses the password `password123`. Log in as `admin@forum.test`, `moderator@forum.test`, or any of `alice/bob/carol/dave/eve/mallory @forum.test`. See [docs/verify-seed.md](docs/verify-seed.md) for the full walkthrough.
+
 ### Run with Docker
 
 ```sh
