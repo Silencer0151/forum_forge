@@ -47,9 +47,9 @@
 {{template "pagination.html" .Pagination}}
 
 {{else}}
-<div class="ff-card" style="text-align:center;padding:var(--ff-sp-5);">
-    <p class="ff-text-muted" style="margin:0;">Your inbox is empty.</p>
-    <a href="/pm/new" class="ff-btn ff-btn--secondary" style="margin-top:var(--ff-sp-2);">Send a message</a>
+<div class="ff-card" style="max-width:480px;margin:0 auto;text-align:center;padding:var(--ff-sp-4);">
+    <p class="ff-text-muted" style="margin:0 0 var(--ff-sp-3);">Your inbox is empty.</p>
+    <a href="/pm/new" class="ff-btn ff-btn--primary">Send a message</a>
 </div>
 {{end}}
 {{end}}
